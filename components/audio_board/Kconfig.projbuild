@@ -1,0 +1,16 @@
+menu "Audio HAL"
+
+choice AUDIO_BOARD
+    prompt "Audio board"
+    default ESP32_S3_SUNTON_BOARD
+    help
+        Select an audio board to use with the ESP-ADF
+config ESP32_S3_DEVKIT_C_BOARD
+    bool "ESP32-S3-DevKitC-1 N16R8"			
+config ESP32_S3_SUNTON_BOARD
+    bool "Sunton ESP32-8048S070"		
+
+endchoice
+
+endmenu
+
