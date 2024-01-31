@@ -17,7 +17,6 @@
 #define CANVAS_V_RES 280
 
 static const char *TAG = "DISPLAY";
-static const char *TUNEIN_REFRESH_BTN_TEXT = "Refresh Station List";
 
 static esp_audio_handle_t player = NULL;
 
@@ -35,16 +34,10 @@ static const lv_font_t *font_m = &lv_font_montserrat_20;
 static const lv_font_t *font_l = &lv_font_montserrat_22;
 static const lv_font_t *font_xl = &lv_font_montserrat_24;
 
-static radio_station_t *radio_stations = NULL;
-static int radio_stations_size = 0;
-
 static lv_obj_t *cower_tile;
 
 static lv_obj_t *canvas;
 static void *canvas_buffer;
-
-static lv_obj_t *radio_station_list;
-static lv_obj_t *radio_station_list_refresh_button;
 
 static lv_obj_t *vol_slider;
 static lv_obj_t *audio_time_slider;
@@ -66,7 +59,7 @@ LV_IMG_DECLARE(dlna_160x44);
 LV_IMG_DECLARE(tunein_160x44);
 LV_IMG_DECLARE(microsd_160x44);
 
-static void file_browser_select_cb(char *url);
+static void sd_card_browser_cb(char *url);
 
 static void slider_event_handler(lv_event_t *e)
 {
@@ -149,41 +142,21 @@ err:
     return ret;
 }
 
-static void radio_station_list_button_handler(lv_event_t *e)
+static void tunein_browser_cb(lv_event_t *e)
 {
-    lv_obj_t *button = lv_event_get_target(e);
-    if (button == radio_station_list_refresh_button)
+    radio_station_t *radio_station = (radio_station_t *)e->user_data;
+    if (tunein_stream_url_get(radio_station) == ESP_OK)
     {
-        if (tunein_favorites_get(&radio_stations, &radio_stations_size) == ESP_OK)
-        {
-            lv_obj_clean(radio_station_list);
-            for (int i = 0; i < radio_stations_size; i++)
-            {
-                button = lv_list_add_btn(radio_station_list, LV_SYMBOL_AUDIO, radio_stations[i].title);
-                lv_obj_add_event_cb(button, radio_station_list_button_handler, LV_EVENT_CLICKED, NULL);
-                lv_group_remove_obj(button);
-            }
-            radio_station_list_refresh_button = lv_list_add_btn(radio_station_list, LV_SYMBOL_REFRESH, TUNEIN_REFRESH_BTN_TEXT);
-            lv_obj_add_event_cb(radio_station_list_refresh_button, radio_station_list_button_handler, LV_EVENT_CLICKED, NULL);
-            lv_group_remove_obj(radio_station_list_refresh_button);
-        }
-    }
-    else
-    {
-        int index = lv_obj_get_child_id(button);
-        if (tunein_stream_url_get(&radio_stations[index]) == ESP_OK)
-        {
-            media_sourece_t source = {
-                .type = MP_SOURCE_TYPE_TUNE_IN,
-                .url = radio_stations[index].stream_url,
-            };
-            player_source_set(&source);
-            show_album_art(radio_stations[index].image_url);
-            // lv_label_set_text(audio_title_label, radio_stations[index].subtitle);
-            lv_label_set_text(audio_album_label, radio_stations[index].title);
-            lv_label_set_text(audio_artist_label, "");
-            player_play();
-        }
+        media_sourece_t source = {
+            .type = MP_SOURCE_TYPE_TUNE_IN,
+            .url = radio_station->stream_url,
+        };
+        player_source_set(&source);
+        show_album_art(radio_station->image_url);
+        // lv_label_set_text(audio_title_label, radio_stations[index].subtitle);
+        lv_label_set_text(audio_album_label, radio_station->title);
+        lv_label_set_text(audio_artist_label, "");
+        player_play();
     }
 }
 
@@ -386,7 +359,7 @@ static void player_event_cb(player_event_t event, void *subject)
     }
 }
 
-static void file_browser_select_cb(char *url)
+static void sd_card_browser_cb(char *url)
 {
     media_sourece_t source = {
         .type = MP_SOURCE_TYPE_SD_CARD,
@@ -425,14 +398,10 @@ void display_lvgl_start(void)
     lv_obj_t *radio_tile = lv_tileview_add_tile(main_tileview, 2, 0, LV_DIR_LEFT);
     lv_obj_set_tile(main_tileview, cower_tile, LV_ANIM_OFF);
 
-    radio_station_list = lv_list_create(radio_tile);
+    lv_obj_t *radio_station_list = tunein_browser_create(radio_tile, tunein_browser_cb);
     lv_obj_set_size(radio_station_list, LV_PCT(100), LV_PCT(100));
 
-    radio_station_list_refresh_button = lv_list_add_btn(radio_station_list, LV_SYMBOL_REFRESH, TUNEIN_REFRESH_BTN_TEXT);
-    lv_obj_add_event_cb(radio_station_list_refresh_button, radio_station_list_button_handler, LV_EVENT_CLICKED, NULL);
-    lv_group_remove_obj(radio_station_list_refresh_button);
-
-    lv_obj_t *file_browser = sd_card_browser_create(local_tile, file_browser_select_cb);
+    lv_obj_t *file_browser = sd_card_browser_create(local_tile, sd_card_browser_cb);
     lv_obj_set_size(file_browser, LV_PCT(100), LV_PCT(100));
 
     wifi_label = lv_label_create(cower_tile);

@@ -6,13 +6,24 @@
 #include "tunein.h"
 #include "http_client.h"
 #include "player.h"
+#include "img_download.h"
 
 #define HTTP_RESPONSE_MAX_SIZE 128 * 1024
 
 static const char *TAG = "TUNE_IN";
 static const char *URL_BASE = "https://opml.radiotime.com/Tune.ashx?id=";
 static const char *URL_FAVORITES = "https://api.tunein.com/profiles/me/follows?folderId=f1&filter=favorites&serial=9a451e82-6daf-48cf-abdc-9192fda47a63&partnerId=RadioTime";
-static const char *URL_NOW_PLAYING = "https://feed.tunein.com/profiles/%s/nowPlaying";
+// static const char *URL_NOW_PLAYING = "https://feed.tunein.com/profiles/%s/nowPlaying";
+
+static lv_obj_t *station_list = NULL;
+static radio_station_t *radio_stations = NULL;
+static int radio_stations_size = 0;
+lv_event_cb_t button_event_cb;
+
+LV_IMG_DECLARE(radio_128x82);
+LV_IMG_DECLARE(tunein_refresh128x128);
+
+static void refresh(void);
 
 esp_err_t tunein_stream_url_get(radio_station_t *radio_station)
 {
@@ -71,7 +82,7 @@ err:
     return ret;
 }
 
-esp_err_t tunein_favorites_get(radio_station_t **stations, int *count)
+static esp_err_t tunein_favorites_get(radio_station_t **stations, int *count)
 {
     esp_err_t ret = ESP_OK;
     int http_res_size;
@@ -147,4 +158,125 @@ err:
         free(http_response);
     }
     return ret;
+}
+
+#define COL_COUNT 4
+#define BUTTON_SIZE 160
+#define BUTTON_IMAGE_SIZE 128
+
+static void refresh_button_handler(lv_event_t *e)
+{
+    refresh();
+}
+
+static void add_refresh_button(int item_count)
+{
+    if (item_count == 0)
+    {
+        static lv_coord_t dsc[] = {BUTTON_SIZE, LV_GRID_TEMPLATE_LAST};
+        lv_obj_set_style_grid_column_dsc_array(station_list, dsc, 0);
+        lv_obj_set_style_grid_row_dsc_array(station_list, dsc, 0);
+        lv_obj_set_layout(station_list, LV_LAYOUT_GRID);
+    }
+    uint8_t col = item_count % COL_COUNT;
+    uint8_t row = item_count / COL_COUNT;
+    lv_obj_t *button = lv_btn_create(station_list);
+    lv_obj_add_event_cb(button, refresh_button_handler, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_grid_cell(button, LV_GRID_ALIGN_STRETCH, col, 1, LV_GRID_ALIGN_STRETCH, row, 1);
+    lv_obj_set_style_bg_img_src(button, &tunein_refresh128x128, 0);
+}
+
+static void refresh(void)
+{
+    lv_obj_clean(station_list);
+    if (radio_stations != NULL)
+    {
+        free(radio_stations);
+        radio_stations = NULL;
+    }
+    radio_stations_size = 0;
+    if (tunein_favorites_get(&radio_stations, &radio_stations_size) == ESP_OK)
+    {
+        lv_coord_t *col_dsc = (lv_coord_t *)malloc((COL_COUNT + 1) * sizeof(lv_coord_t));
+        for (int i = 0; i < COL_COUNT; i++)
+        {
+            col_dsc[i] = BUTTON_SIZE;
+        }
+        col_dsc[COL_COUNT] = LV_GRID_TEMPLATE_LAST;
+
+        int ROW_COUNT = ((radio_stations_size + 1) / COL_COUNT) + 1;
+        lv_coord_t *row_dsc = (lv_coord_t *)malloc((ROW_COUNT + 1) * sizeof(lv_coord_t));
+        for (int i = 0; i < ROW_COUNT; i++)
+        {
+            row_dsc[i] = BUTTON_SIZE;
+        }
+        row_dsc[radio_stations_size] = LV_GRID_TEMPLATE_LAST;
+
+        ESP_LOGD(TAG, "radio_stations_size=%d, COL_COUNT=%d, ROW_COUNT=%d", radio_stations_size, COL_COUNT, ROW_COUNT);
+
+        lv_obj_set_style_grid_column_dsc_array(station_list, col_dsc, 0);
+        lv_obj_set_style_grid_row_dsc_array(station_list, row_dsc, 0);
+        lv_obj_set_layout(station_list, LV_LAYOUT_GRID);
+
+        lv_obj_t *button;
+        lv_obj_t *label;
+        lv_obj_t *canvas;
+        void *canvas_buffer;
+
+        for (int i = 0; i < radio_stations_size; i++)
+        {
+            uint8_t col = i % COL_COUNT;
+            uint8_t row = i / COL_COUNT;
+
+            ESP_LOGD(TAG, "title=%s, i=%d, col=%d, row=%d", radio_stations[i].title, i, col, row);
+
+            button = lv_btn_create(station_list);
+            lv_obj_add_event_cb(button, button_event_cb, LV_EVENT_CLICKED, &radio_stations[i]);
+            lv_obj_set_grid_cell(button, LV_GRID_ALIGN_STRETCH, col, 1, LV_GRID_ALIGN_STRETCH, row, 1);
+
+            lv_img_dsc_t station_image = {
+                .data = NULL,
+            };
+            if (download_image(radio_stations[i].image_url, &station_image) != ESP_OK)
+            {
+                ESP_LOGE(TAG, "Cannot download station image: %s", radio_stations[i].title);
+                if (station_image.data)
+                    free(station_image.data);
+
+                label = lv_label_create(button);
+                lv_label_set_text(label, radio_stations[i].title);
+                lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
+                lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+                lv_obj_set_style_bg_img_src(button, &radio_128x82, 0);
+
+                continue;
+            }
+
+            int h_zoom = (BUTTON_IMAGE_SIZE * LV_IMG_ZOOM_NONE) / station_image.header.w;
+            int v_zoom = (BUTTON_IMAGE_SIZE * LV_IMG_ZOOM_NONE) / station_image.header.h;
+            uint16_t zoom = h_zoom < v_zoom ? h_zoom : v_zoom;
+            int h_size = (station_image.header.w * zoom) / LV_IMG_ZOOM_NONE;
+            int v_size = (station_image.header.h * zoom) / LV_IMG_ZOOM_NONE;
+
+            canvas_buffer = (void *)malloc(h_size * v_size * sizeof(uint16_t));
+            // ESP_GOTO_ON_FALSE(canvas_buffer != NULL, ESP_ERR_NO_MEM, err, TAG, "Cannot allocate memmory for canvas buffer");
+            canvas = lv_canvas_create(button);
+            lv_canvas_set_buffer(canvas, canvas_buffer, h_size, v_size, LV_IMG_CF_TRUE_COLOR);
+            lv_canvas_transform(canvas, &station_image, 0, zoom, 0, 0, 0, 0, false);
+            lv_obj_center(canvas);
+
+            if (station_image.data)
+                free(station_image.data);
+        }
+    }
+    add_refresh_button(radio_stations_size);
+}
+
+lv_obj_t *tunein_browser_create(lv_obj_t *parent, lv_event_cb_t event_cb)
+{
+    button_event_cb = event_cb;
+    station_list = lv_obj_create(parent);
+    add_refresh_button(0);
+    return station_list;
 }
