@@ -25,7 +25,7 @@ typedef enum
     MP_EVENT_MUTE = 2,
     MP_EVENT_SOURCE = 3,
     MP_EVENT_POSITION = 4,
-    MP_EVENT_ICY_METADATA = 5,
+    // MP_EVENT_ICY_METADATA = 5,
 } player_event_t;
 
 typedef enum

@@ -3,49 +3,49 @@
 
 #include "esp_err.h"
 
-#define EMPTY_METADATA()     \
-    {                        \
-        .duration = 0,       \
-        .title = NULL,       \
-        .creator = NULL,     \
-        .album = NULL,       \
-        .artist = NULL,      \
-        .queueItemId = NULL, \
-        .albumArtURI = NULL, \
-        .upnp_class = NULL,  \
-        .mimeType = NULL,    \
-        .guide_id = NULL,    \
-        .stream_url = NULL,  \
-        .subtitle = NULL,    \
-        .description = NULL, \
-    }
 
 typedef struct
 {
     char *title;
-    char *creator;
     char *album;
     char *artist;
     int duration;
-    char *queueItemId;
-    char *albumArtURI;
-    char *upnp_class;
-    char *mimeType;
-    char *res;
-
-    char *guide_id;
     char *stream_url;
-    char *subtitle;
-    char *description;
-
+    char *image_url;
 } audio_metadata_t;
 
-esp_err_t metadata_from_dlna_xml(char *xml, audio_metadata_t *metadata);
-esp_err_t metadata_to_dlna_xml(audio_metadata_t *metadata, char **xml);
+typedef enum
+{
+    METADATA_EVENT = 0,
+} metadata_event_t;
 
-esp_err_t metadata_from_icy_string(char *icy_str, audio_metadata_t *metadata);
+typedef void (*metadata_event_cb)(metadata_event_t event, void *subject);
 
-void metadata_copy(audio_metadata_t *source, audio_metadata_t *target);
-void metadata_free(audio_metadata_t *metadata);
+typedef struct
+{
+    metadata_event_cb callback;
+    struct metadataa_event_cb_node_t *next;
+} metadata_event_cb_node_t;
+
+void metadata_add_event_listener(metadata_event_cb callback);
+
+esp_err_t metadata_set_dlna_xml(char *xml);
+esp_err_t metadata_get_dlna_xml(char **xml);
+
+esp_err_t metadata_set_icy_str(char *icy);
+
+char *metadata_title_get(void);
+char *metadata_album_get(void);
+char *metadata_artist_get(void);
+int metadata_duration_get(void);
+char *metadata_stream_url_get(void);
+char *metadata_image_url_get(cvoid);
+
+void metadata_set(char *title,
+                  char *album,
+                  char *artist,
+                  int duration,
+                  char *stream_url,
+                  char *image_url);
 
 #endif

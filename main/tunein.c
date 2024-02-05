@@ -20,8 +20,8 @@ static radio_station_t *radio_stations = NULL;
 static int radio_stations_size = 0;
 lv_event_cb_t button_event_cb;
 
-LV_IMG_DECLARE(radio_128x82);
-LV_IMG_DECLARE(tunein_refresh128x128);
+LV_IMG_DECLARE(radio_128x104);
+LV_IMG_DECLARE(tunein_refresh_128x128);
 
 static void refresh(void);
 
@@ -183,7 +183,7 @@ static void add_refresh_button(int item_count)
     lv_obj_t *button = lv_btn_create(station_list);
     lv_obj_add_event_cb(button, refresh_button_handler, LV_EVENT_CLICKED, NULL);
     lv_obj_set_grid_cell(button, LV_GRID_ALIGN_STRETCH, col, 1, LV_GRID_ALIGN_STRETCH, row, 1);
-    lv_obj_set_style_bg_img_src(button, &tunein_refresh128x128, 0);
+    lv_obj_set_style_bg_img_src(button, &tunein_refresh_128x128, 0);
 }
 
 static void refresh(void)
@@ -218,6 +218,7 @@ static void refresh(void)
         lv_obj_set_style_grid_row_dsc_array(station_list, row_dsc, 0);
         lv_obj_set_layout(station_list, LV_LAYOUT_GRID);
 
+        lv_obj_t *img;
         lv_obj_t *button;
         lv_obj_t *label;
         lv_obj_t *canvas;
@@ -248,8 +249,9 @@ static void refresh(void)
                 lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL_CIRCULAR);
                 lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, 0);
 
-                lv_obj_set_style_bg_img_src(button, &radio_128x82, 0);
-
+                img = lv_img_create(button);
+                lv_img_set_src(img, &radio_128x104);
+                lv_obj_align(img, LV_ALIGN_TOP_MID, 0, 8);
                 continue;
             }
 

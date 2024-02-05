@@ -252,9 +252,7 @@ static int esp_http_stream_callback(http_stream_event_msg_t *msg)
     if (msg->event_id == HTTP_STREAM_ICY_METADATA)
     {
         ESP_LOGI(TAG, "ICY metadata found in http stream[%d] = [%s]", msg->buffer_len, (char *)msg->buffer);
-        audio_metadata_t metadata = EMPTY_METADATA();
-        metadata_from_icy_string(msg->buffer, &metadata);
-        fire_event(MP_EVENT_ICY_METADATA, &metadata);
+        metadata_set_icy_str(msg->buffer);
     }
     if (msg->event_id == HTTP_STREAM_ICY_HEADER)
     {

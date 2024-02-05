@@ -27,7 +27,7 @@ typedef struct sdcard_list
 
 #define SDCARD_LIST_URL_MAX_LENGTH (1024 * 2)
 
-static const char *TAG = "LV_FILE_BROWSER";
+static const char *TAG = "SD_CARD_BROWSER";
 static lv_obj_t *file_list = NULL;
 static lv_obj_t *dir_up_button = NULL;
 static const char *root = SD_MOUNT_POINT;

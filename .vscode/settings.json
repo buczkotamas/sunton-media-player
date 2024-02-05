@@ -18,7 +18,16 @@
     "files.associations": {
         "metadata.h": "c",
         "media_lib_adapter.h": "c",
-        "esp_log.h": "c"
+        "esp_log.h": "c",
+        "*.tcc": "c",
+        "ratio": "c",
+        "system_error": "c",
+        "array": "c",
+        "functional": "c",
+        "regex": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c"
     },
     "idf.flashType": "UART",
     "idf.portWin": "COM3"

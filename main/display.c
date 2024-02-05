@@ -152,11 +152,8 @@ static void tunein_browser_cb(lv_event_t *e)
             .url = radio_station->stream_url,
         };
         player_source_set(&source);
-        show_album_art(radio_station->image_url);
-        // lv_label_set_text(audio_title_label, radio_stations[index].subtitle);
-        lv_label_set_text(audio_album_label, radio_station->title);
-        lv_label_set_text(audio_artist_label, "");
         player_play();
+        metadata_set(radio_station->title, radio_station->title, "TuneIn Radio", 0, radio_station->stream_url, radio_station->image_url);
     }
 }
 
@@ -252,17 +249,16 @@ static void timer_handle(lv_timer_t *timer)
     }
 }
 
-static void dlna_event_handler(dlna_event_t event, void *subject)
+static void metadata_cb(metadata_event_t event, void *subject)
 {
     switch (event)
     {
-    case DLNA_EVENT_METADATA:
-        audio_metadata_t *metadata = (audio_metadata_t *)subject;
-        lv_label_set_text(audio_title_label, metadata->title == NULL ? "Unknown track" : metadata->title);
-        lv_label_set_text(audio_album_label, metadata->album == NULL ? "Unknown album" : metadata->album);
-        lv_label_set_text(audio_artist_label, metadata->artist == NULL ? "Unknown artist" : metadata->artist);
-        set_audio_duration(metadata->duration);
-        show_album_art(metadata->albumArtURI);
+    case METADATA_EVENT:
+        lv_label_set_text(audio_title_label, metadata_title_get() == NULL ? "Unknown track" : metadata_title_get());
+        lv_label_set_text(audio_artist_label, metadata_artist_get() == NULL ? "Unknown track" : metadata_artist_get());
+        lv_label_set_text(audio_album_label, metadata_album_get() == NULL ? "Unknown track" : metadata_album_get());
+        set_audio_duration(metadata_duration_get());
+        show_album_art(metadata_image_url_get());
         break;
     default:
         break;
@@ -324,10 +320,6 @@ static void player_event_cb(player_event_t event, void *subject)
         bool *mute = (bool *)subject;
         mute_set(*mute);
         break;
-    case MP_EVENT_ICY_METADATA:
-        audio_metadata_t *metadata = (audio_metadata_t *)subject;
-        lv_label_set_text(audio_title_label, metadata->title == NULL ? "Unknown track" : metadata->title);
-        break;
     case MP_EVENT_SOURCE:
         media_sourece_t *source = (media_sourece_t *)subject;
         lv_obj_add_flag(media_source_image, LV_OBJ_FLAG_HIDDEN);
@@ -361,25 +353,26 @@ static void player_event_cb(player_event_t event, void *subject)
 
 static void sd_card_browser_cb(char *url)
 {
+    char *cover = NULL;
+    char *slash = strrchr(url, '/');
+    if (slash)
+    {
+        int folder_length = slash - url;
+        cover = malloc(folder_length + 10 + 1); // "/cover.jpg" + '/0'
+        strncpy(cover, url, folder_length);
+        strcpy(cover + folder_length, "/cover.jpg");
+    }
     media_sourece_t source = {
         .type = MP_SOURCE_TYPE_SD_CARD,
         .url = url,
     };
     player_source_set(&source);
     player_play();
-    lv_label_set_text(audio_title_label, url);
-    lv_label_set_text(audio_album_label, "");
-    lv_label_set_text(audio_artist_label, "");
-    char *slash = strrchr(url, '/');
-    if (slash)
-    {
-        int folder_length = slash - url;
-        char *cover = malloc(folder_length + 10 + 1); // "/cover.jpg" + '/0'
-        strncpy(cover, url, folder_length);
-        strcpy(cover + folder_length, "/cover.jpg");
-        show_album_art(cover);
+    int duration = 0;
+    player_audio_duration_get(&duration);
+    metadata_set(url, "SD Card", "", duration, url, cover);
+    if (cover != NULL)
         free(cover);
-    }
 }
 
 void display_lvgl_start(void)
@@ -515,7 +508,7 @@ void display_lvgl_start(void)
 
     lvgl_port_unlock();
 
-    dlna_add_event_listener(dlna_event_handler);
+    metadata_add_event_listener(metadata_cb);
     player_add_event_listener(player_event_cb);
 
     wifi_signal_update_timer = lv_timer_create(timer_handle, 10 * 1000, NULL);

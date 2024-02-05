@@ -9,43 +9,7 @@
 static const char *TAG = "DLNA";
 
 static esp_dlna_handle_t dlna_handle;
-static dlna_event_cb_node_t *event_cb_list_root = NULL;
-static audio_metadata_t metadata = EMPTY_METADATA();
 static char *escaped_metadata = NULL;
-
-void dlna_add_event_listener(dlna_event_cb callback)
-{
-    if (event_cb_list_root == NULL)
-    {
-        event_cb_list_root = (dlna_event_cb_node_t *)malloc(sizeof(dlna_event_cb_node_t));
-        event_cb_list_root->callback = callback;
-        event_cb_list_root->next = NULL;
-    }
-    else
-    {
-        dlna_event_cb_node_t *new_node = (dlna_event_cb_node_t *)malloc(sizeof(dlna_event_cb_node_t));
-        new_node->callback = callback;
-        new_node->next = NULL;
-
-        dlna_event_cb_node_t *node = event_cb_list_root;
-        while (node->next != NULL)
-            node = node->next;
-        node->next = new_node;
-    }
-}
-
-static void fire_event(dlna_event_t event, void *subject)
-{
-    ESP_LOGI(TAG, "Sending event %d to all observer", event);
-    dlna_event_cb_node_t *node = event_cb_list_root;
-    while (node != NULL)
-    {
-        ESP_LOGI(TAG, "Sending event %d to %p", event, node->callback);
-        (node->callback)(event, subject);
-        node = node->next;
-    }
-    ESP_LOGI(TAG, "All observer notified");
-}
 
 static char *player_state_to_trans_state(player_state_t player_state)
 {
@@ -130,11 +94,11 @@ static int dlna_renderer_request(esp_dlna_handle_t dlna, const upnp_attr_t *attr
             .url = buffer,
         };
         player_source_set(&source);
+        player_play();
         return 0;
     case AVT_SET_TRACK_METADATA:
         ESP_LOGD(TAG, "SetAVTransportURI, CurrentURIMetaData = %s", buffer);
-        metadata_from_dlna_xml(buffer, &metadata);
-        fire_event(DLNA_EVENT_METADATA, &metadata);
+        metadata_set_dlna_xml(buffer);
         if (escaped_metadata != NULL)
             free(escaped_metadata);
         hesc_escape_html((uint8_t **)&escaped_metadata, (uint8_t *)buffer, strlen(buffer));
@@ -162,9 +126,9 @@ static int dlna_renderer_request(esp_dlna_handle_t dlna, const upnp_attr_t *attr
     case AVT_GET_TRACK_DURATION:
     case AVT_GET_MEDIA_DURATION:
         player_audio_duration_get(&tmp_data);
-        if (tmp_data == 0 && metadata.duration != 0)
+        if (tmp_data == 0 && metadata_duration_get() != 0)
         {
-            tmp_data = metadata.duration;
+            tmp_data = metadata_duration_get();
         }
         ESP_LOGD(TAG, "GetMediaInfo or CurrentMediaDuration notify, reply = %02d:%02d:%02d", tmp_data / 3600, tmp_data / 60, tmp_data % 60);
         return snprintf(buffer, max_buffer_len, "%02d:%02d:%02d", tmp_data / 3600, tmp_data / 60, tmp_data % 60);
@@ -187,7 +151,32 @@ static int dlna_renderer_request(esp_dlna_handle_t dlna, const upnp_attr_t *attr
     return 0;
 }
 
-static void player_event_cb(player_event_t event, void *subject)
+static void metadata_cb(metadata_event_t event, void *subject)
+{
+    switch (event)
+    {
+    case METADATA_EVENT:
+        if (player_source_get()->type != MP_SOURCE_TYPE_DLNA)
+        {
+            if (escaped_metadata != NULL)
+                free(escaped_metadata);
+            char *xml;
+            if (metadata_get_dlna_xml(&xml) == ESP_OK)
+            {
+                ESP_LOGD(TAG, "XML metadata = %s", xml);
+                hesc_escape_html((uint8_t **)&escaped_metadata, (uint8_t *)xml, strlen(xml));
+                ESP_LOGD(TAG, "Escaped metadata = %s", escaped_metadata);
+                if (xml != NULL)
+                    free(xml);
+            }
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void player_cb(player_event_t event, void *subject)
 {
     switch (event)
     {
@@ -256,7 +245,8 @@ esp_dlna_handle_t dlna_start()
 
     ESP_LOGI(TAG, "DLNA started");
 
-    player_add_event_listener(player_event_cb);
+    player_add_event_listener(player_cb);
+    metadata_add_event_listener(metadata_cb);
 
     return dlna_handle;
 }

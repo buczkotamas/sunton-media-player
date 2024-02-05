@@ -19,14 +19,13 @@ static const char *TAG = "MAIN";
 void app_main()
 {
     esp_log_level_set("*", ESP_LOG_INFO);
-    esp_log_level_set(TAG, ESP_LOG_DEBUG);
+    // esp_log_level_set(TAG, ESP_LOG_DEBUG);
     // esp_log_level_set("DISPLAY", ESP_LOG_DEBUG);
     // esp_log_level_set("LGFX_DISPLAY", ESP_LOG_DEBUG);
     // esp_log_level_set("METADATA", ESP_LOG_DEBUG);
-    esp_log_level_set("PLAYER", ESP_LOG_DEBUG);
-    esp_log_level_set("LV_FILE_BROWSER", ESP_LOG_DEBUG);
+    // esp_log_level_set("PLAYER", ESP_LOG_DEBUG);
     // esp_log_level_set("BUTTONS", ESP_LOG_DEBUG);
-    // esp_log_level_set("DLNA", ESP_LOG_DEBUG);
+    esp_log_level_set("DLNA", ESP_LOG_DEBUG);
     // esp_log_level_set("IMG_DOWNLOAD", ESP_LOG_DEBUG);
     // esp_log_level_set("LVGL", ESP_LOG_DEBUG);
     // esp_log_level_set("JPEG", ESP_LOG_DEBUG);
