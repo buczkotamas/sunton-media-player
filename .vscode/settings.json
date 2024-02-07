@@ -27,7 +27,8 @@
         "regex": "c",
         "tuple": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "map": "c"
     },
     "idf.flashType": "UART",
     "idf.portWin": "COM3"

@@ -143,6 +143,10 @@ static esp_err_t i2s_stream_volume_set(audio_element_handle_t i2s_stream, int vo
 
 esp_err_t player_volume_set(int volume)
 {
+    if (volume > 100)
+        volume = 100;
+    if (volume < 0)
+        volume = 0;
     return i2s_stream_volume_set(i2s_stream_handle, volume);
 }
 
@@ -257,8 +261,8 @@ static int esp_http_stream_callback(http_stream_event_msg_t *msg)
     if (msg->event_id == HTTP_STREAM_ICY_HEADER)
     {
         ESP_LOGI(TAG, "ICY header found in http stream[%d] = [%s]", msg->buffer_len, (char *)msg->buffer);
-        //fire_event(MP_EVENT_ICY_HEADER, msg->buffer);
-    }    
+        // fire_event(MP_EVENT_ICY_HEADER, msg->buffer);
+    }
     return ESP_OK;
 }
 

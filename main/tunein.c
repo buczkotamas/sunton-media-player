@@ -7,6 +7,7 @@
 #include "http_client.h"
 #include "player.h"
 #include "img_download.h"
+#include "ui.h"
 
 #define HTTP_RESPONSE_MAX_SIZE 128 * 1024
 
@@ -279,6 +280,7 @@ lv_obj_t *tunein_browser_create(lv_obj_t *parent, lv_event_cb_t event_cb)
 {
     button_event_cb = event_cb;
     station_list = lv_obj_create(parent);
+    lv_obj_set_style_pad_all(station_list, UI_PADDING_ALL, LV_PART_MAIN);
     add_refresh_button(0);
     return station_list;
 }
