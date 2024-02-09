@@ -12,6 +12,7 @@
 #include "tunein.h"
 #include "dlna.h"
 #include "sd_card_browser.h"
+#include "volume_window.h"
 #include "ui.h"
 
 static const char *TAG = "DISPLAY";
@@ -26,12 +27,6 @@ static lv_timer_t *wifi_signal_update_timer = NULL;
 static lv_timer_t *audio_time_increment_timer = NULL;
 static int32_t audio_time = 0;
 
-// static const lv_font_t *font_xs = &lv_font_montserrat_16;
-static const lv_font_t *font_s = &lv_font_montserrat_18;
-// static const lv_font_t *font_m = &lv_font_montserrat_20;
-static const lv_font_t *font_l = &lv_font_montserrat_22;
-// static const lv_font_t *font_xl = &lv_font_montserrat_24;
-
 static lv_obj_t *home_tab;
 
 static char *album_art_url = NULL;
@@ -40,7 +35,6 @@ static void *canvas_buffer;
 
 static lv_obj_t *ctrl_btn_mtrx;
 static lv_obj_t *vol_btn_mtrx;
-static lv_obj_t *vol_slider;
 static lv_obj_t *audio_time_slider;
 static lv_obj_t *audio_time_label;
 static lv_obj_t *audio_duration_label;
@@ -49,12 +43,7 @@ static lv_obj_t *audio_title_label;
 static lv_obj_t *audio_album_label;
 static lv_obj_t *audio_artist_label;
 static lv_obj_t *media_source_image;
-// static lv_obj_t *prev_button;
-// static lv_obj_t *play_button;
-// static lv_obj_t *stop_button;
-// static lv_obj_t *next_button;
 static lv_obj_t *wifi_label;
-// static lv_obj_t *audio_creator_label;
 
 static const char *CTRL_BTN_MAP_PLAY[] = {LV_SYMBOL_PREV, LV_SYMBOL_STOP, LV_SYMBOL_PLAY, LV_SYMBOL_NEXT, NULL};
 static const char *CTRL_BTN_MAP_PAUSE[] = {LV_SYMBOL_PREV, LV_SYMBOL_STOP, LV_SYMBOL_PAUSE, LV_SYMBOL_NEXT, NULL};
@@ -74,10 +63,6 @@ static void slider_event_handler(lv_event_t *e)
     {
         player_seek(value);
     }
-    if (target == vol_slider)
-    {
-        player_volume_set(value);
-    }
 }
 
 static void button_event_handler(lv_event_t *e)
@@ -88,19 +73,6 @@ static void button_event_handler(lv_event_t *e)
     {
         if (target == mute_button)
             player_mute_set(!player_mute_get());
-        // if (target == prev_button && player_source_get()->type == MP_SOURCE_TYPE_SD_CARD)
-        //     sd_card_browser_prev();
-        // if (target == play_button)
-        // {
-        //     if (player_state_get() == MP_STATE_PLAYING)
-        //         player_pause();
-        //     else
-        //         player_play();
-        // }
-        // if (target == stop_button)
-        //     player_stop();
-        // if (target == next_button && player_source_get()->type == MP_SOURCE_TYPE_SD_CARD)
-        //     sd_card_browser_next();
     }
     else if (code == LV_EVENT_VALUE_CHANGED)
     {
@@ -108,10 +80,16 @@ static void button_event_handler(lv_event_t *e)
         if (target == vol_btn_mtrx)
         {
             id = lv_btnmatrix_get_selected_btn(target);
-            int vol = 0;
-            player_volume_get(&vol);
-            vol += id == 0 ? -5 : 5;
-            player_volume_set(vol);
+            int volume = 0;
+            player_volume_get(&volume);
+            volume += id == 0 ? -5 : 5;
+            if (volume > 100)
+                volume = 100;
+            if (volume < 0)
+                volume = 0;
+            player_volume_set(volume);
+
+            volume_window_show(volume);
         }
         if (target == ctrl_btn_mtrx)
         {
@@ -208,10 +186,6 @@ static void tunein_browser_cb(lv_event_t *e)
 static void mute_set(bool mute)
 {
     lv_obj_set_style_bg_img_src(mute_button, mute ? LV_SYMBOL_MUTE : LV_SYMBOL_VOLUME_MAX, 0);
-    if (mute)
-        lv_obj_clear_flag(vol_slider, LV_OBJ_FLAG_CLICKABLE);
-    else
-        lv_obj_add_flag(vol_slider, LV_OBJ_FLAG_CLICKABLE);
 }
 
 static void set_audio_time(int32_t time)
@@ -360,8 +334,8 @@ static void player_event_cb(player_event_t event, void *subject)
         }
         break;
     case MP_EVENT_VOLUME:
-        int *volume = (int *)subject;
-        lv_slider_set_value(vol_slider, *volume, LV_ANIM_ON);
+        // int *volume = (int *)subject;
+        // lv_slider_set_value(vol_slider, *volume, LV_ANIM_ON);
         break;
     case MP_EVENT_MUTE:
         bool *mute = (bool *)subject;
@@ -477,7 +451,7 @@ void display_lvgl_start(void)
     lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, 0);
 
     wifi_label = lv_label_create(home_tab);
-    lv_obj_set_style_text_font(wifi_label, font_s, 0);
+    lv_obj_set_style_text_font(wifi_label, UI_FONT_S, 0);
     lv_label_set_long_mode(wifi_label, LV_LABEL_LONG_WRAP);
     lv_label_set_text_fmt(wifi_label, "%s %d %%", LV_SYMBOL_WIFI, http_client_wifi_signal_quality_get());
     lv_obj_set_width(wifi_label, 48);
@@ -485,7 +459,7 @@ void display_lvgl_start(void)
     lv_obj_align_to(wifi_label, home_tab, LV_ALIGN_TOP_LEFT, 10, 10);
 
     audio_artist_label = lv_label_create(home_tab);
-    lv_obj_set_style_text_font(audio_artist_label, font_s, 0);
+    lv_obj_set_style_text_font(audio_artist_label, UI_FONT_S, 0);
     lv_label_set_long_mode(audio_artist_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(audio_artist_label, "");
     lv_obj_set_width(audio_artist_label, LV_PCT(100));
@@ -493,7 +467,7 @@ void display_lvgl_start(void)
     lv_obj_align_to(audio_artist_label, footer, LV_ALIGN_OUT_TOP_MID, 0, -6);
 
     audio_album_label = lv_label_create(home_tab);
-    lv_obj_set_style_text_font(audio_album_label, font_s, 0);
+    lv_obj_set_style_text_font(audio_album_label, UI_FONT_S, 0);
     lv_label_set_long_mode(audio_album_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(audio_album_label, "");
     lv_obj_set_width(audio_album_label, LV_PCT(100));
@@ -501,27 +475,19 @@ void display_lvgl_start(void)
     lv_obj_align_to(audio_album_label, audio_artist_label, LV_ALIGN_OUT_TOP_MID, 0, -6);
 
     audio_title_label = lv_label_create(home_tab);
-    lv_obj_set_style_text_font(audio_title_label, font_s, 0);
+    lv_obj_set_style_text_font(audio_title_label, UI_FONT_S, 0);
     lv_label_set_long_mode(audio_title_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_label_set_text(audio_title_label, "No media");
     lv_obj_set_width(audio_title_label, LV_PCT(100));
     lv_obj_set_style_text_align(audio_title_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align_to(audio_title_label, audio_album_label, LV_ALIGN_OUT_TOP_MID, 0, -6);
 
-    vol_slider = lv_slider_create(home_tab);
-    // lv_coord_t def_height = lv_obj_get_style_height(vol_slider, LV_PART_MAIN);
-    lv_slider_set_range(vol_slider, 0, 100);
-    lv_slider_set_value(vol_slider, 16, LV_ANIM_OFF);
-    lv_obj_set_size(vol_slider, 6, 230);
-    lv_obj_add_event_cb(vol_slider, slider_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_align(vol_slider, LV_ALIGN_TOP_RIGHT, -32, 20);
-
-    mute_button = lv_btn_create(home_tab);
-    lv_obj_add_event_cb(mute_button, button_event_handler, LV_EVENT_CLICKED, NULL);
-    lv_obj_set_size(mute_button, 32, 32);
-    lv_obj_set_style_radius(mute_button, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_img_src(mute_button, LV_SYMBOL_VOLUME_MAX, 0);
-    lv_obj_align_to(mute_button, vol_slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 24);
+    // mute_button = lv_btn_create(home_tab);
+    // lv_obj_add_event_cb(mute_button, button_event_handler, LV_EVENT_CLICKED, NULL);
+    // lv_obj_set_size(mute_button, 32, 32);
+    // lv_obj_set_style_radius(mute_button, LV_RADIUS_CIRCLE, 0);
+    // lv_obj_set_style_bg_img_src(mute_button, LV_SYMBOL_VOLUME_MAX, 0);
+    // lv_obj_align_to(mute_button, vol_slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 24);
 
     // ---------------------------------------------------
     // FOOTER --------------------------------------------
@@ -535,36 +501,8 @@ void display_lvgl_start(void)
     lv_obj_add_event_cb(audio_time_slider, slider_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_align(audio_time_slider, LV_ALIGN_TOP_MID, 0, 0);
 
-    // prev_button = lv_btn_create(footer);
-    // lv_obj_add_event_cb(prev_button, button_event_handler, LV_EVENT_CLICKED, NULL);
-    // lv_obj_set_size(prev_button, 48, 48);
-    // lv_obj_set_style_radius(prev_button, LV_RADIUS_CIRCLE, 0);
-    // lv_obj_set_style_bg_img_src(prev_button, LV_SYMBOL_PREV, 0);
-    // lv_obj_align(prev_button, LV_ALIGN_BOTTOM_MID, -32 - 64, 0);
-
-    // stop_button = lv_btn_create(footer);
-    // lv_obj_add_event_cb(stop_button, button_event_handler, LV_EVENT_CLICKED, NULL);
-    // lv_obj_set_size(stop_button, 48, 48);
-    // lv_obj_set_style_radius(stop_button, LV_RADIUS_CIRCLE, 0);
-    // lv_obj_set_style_bg_img_src(stop_button, LV_SYMBOL_STOP, 0);
-    // lv_obj_align(stop_button, LV_ALIGN_BOTTOM_MID, -32, 0);
-
-    // play_button = lv_btn_create(footer);
-    // lv_obj_add_event_cb(play_button, button_event_handler, LV_EVENT_CLICKED, NULL);
-    // lv_obj_set_size(play_button, 48, 48);
-    // lv_obj_set_style_radius(play_button, LV_RADIUS_CIRCLE, 0);
-    // lv_obj_set_style_bg_img_src(play_button, LV_SYMBOL_PLAY, 0);
-    // lv_obj_align(play_button, LV_ALIGN_BOTTOM_MID, 32, 0);
-
-    // next_button = lv_btn_create(footer);
-    // lv_obj_add_event_cb(next_button, button_event_handler, LV_EVENT_CLICKED, NULL);
-    // lv_obj_set_size(next_button, 48, 48);
-    // lv_obj_set_style_radius(next_button, LV_RADIUS_CIRCLE, 0);
-    // lv_obj_set_style_bg_img_src(next_button, LV_SYMBOL_NEXT, 0);
-    // lv_obj_align(next_button, LV_ALIGN_BOTTOM_MID, 32 + 64, 0);
-
     audio_time_label = lv_label_create(footer);
-    lv_obj_set_style_text_font(audio_time_label, font_s, 0);
+    lv_obj_set_style_text_font(audio_time_label, UI_FONT_S, 0);
     lv_label_set_long_mode(audio_time_label, LV_LABEL_LONG_CLIP);
     lv_label_set_text(audio_time_label, "00:00:00");
     lv_obj_set_width(audio_time_label, 120);
@@ -572,7 +510,7 @@ void display_lvgl_start(void)
     lv_obj_align(audio_time_label, LV_ALIGN_TOP_LEFT, 0, -5);
 
     audio_duration_label = lv_label_create(footer);
-    lv_obj_set_style_text_font(audio_duration_label, font_s, 0);
+    lv_obj_set_style_text_font(audio_duration_label, UI_FONT_S, 0);
     lv_label_set_long_mode(audio_duration_label, LV_LABEL_LONG_CLIP);
     lv_label_set_text(audio_duration_label, "00:00:00");
     lv_obj_set_width(audio_duration_label, 120);
@@ -588,7 +526,7 @@ void display_lvgl_start(void)
     lv_style_set_border_color(&style_vol_bg, lv_palette_main(LV_PALETTE_GREY));
     lv_style_set_border_width(&style_vol_bg, 1);
     lv_style_set_radius(&style_vol_bg, LV_RADIUS_CIRCLE);
-    lv_style_set_text_font(&style_vol_bg, font_l);
+    lv_style_set_text_font(&style_vol_bg, UI_FONT_L);
 
     static lv_style_t style_vol_btn;
     lv_style_init(&style_vol_btn);
@@ -610,7 +548,7 @@ void display_lvgl_start(void)
 
     lv_obj_align(vol_btn_mtrx, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     /* volume button matrix */
-
+    /* control button matrix */
     ctrl_btn_mtrx = lv_btnmatrix_create(footer);
     lv_btnmatrix_set_map(ctrl_btn_mtrx, CTRL_BTN_MAP_PLAY);
     lv_obj_add_style(ctrl_btn_mtrx, &style_vol_bg, LV_PART_MAIN);
@@ -619,7 +557,7 @@ void display_lvgl_start(void)
     lv_obj_set_size(ctrl_btn_mtrx, 48 * 6, 48);
 
     lv_obj_align(ctrl_btn_mtrx, LV_ALIGN_BOTTOM_MID, 0, 0);
-    /* volume button matrix */
+    /* control button matrix */
 
     media_source_image = lv_img_create(footer);
     lv_obj_align(media_source_image, LV_ALIGN_BOTTOM_RIGHT, 0, 0);

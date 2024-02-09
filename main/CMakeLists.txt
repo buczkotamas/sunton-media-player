@@ -11,6 +11,7 @@ set(COMPONENT_SRCS
     "tunein.c"
     "http_client.c"
     "sd_card_browser.c"
+    "volume_window.c"
     
     "img/dlna_160x44.c"
     "img/tunein_160x44.c"

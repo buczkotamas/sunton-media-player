@@ -28,7 +28,10 @@
         "tuple": "c",
         "type_traits": "c",
         "utility": "c",
-        "map": "c"
+        "map": "c",
+        "sd_card_browser.h": "c",
+        "volume_window.h": "c",
+        "ui.h": "c"
     },
     "idf.flashType": "UART",
     "idf.portWin": "COM3"
