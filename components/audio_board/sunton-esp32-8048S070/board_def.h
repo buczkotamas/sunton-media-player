@@ -30,16 +30,14 @@
 #define AUDIO_RESAMPLE_RATE     AUDIO_SAMPLE_RATE
 #define AUDIO_RINGBUFFER_SIZE   (512 * 1024)
 
-//#define AUDIO_I2S_OUTPUT_USB_UART   (1)
-#ifdef AUDIO_I2S_OUTPUT_USB_UART
-    #define I2S_PIN_DATA_OUT    GPIO_NUM_43; // TX
-    #define I2S_PIN_WORD_SELECT GPIO_NUM_44; // RX
-    #define I2S_PIN_BIT_CLOCK   GPIO_NUM_18;
-#else
-    #define I2S_PIN_DATA_OUT    GPIO_NUM_17;
-    #define I2S_PIN_WORD_SELECT GPIO_NUM_18;
-    #define I2S_PIN_BIT_CLOCK   GPIO_NUM_0; // boot button
-#endif
+#define I2S_PIN_UART_DATA_OUT    GPIO_NUM_43; // TX
+#define I2S_PIN_UART_WORD_SELECT GPIO_NUM_44; // RX
+#define I2S_PIN_UART_BIT_CLOCK   GPIO_NUM_18;
+
+#define I2S_PIN_BUILTIN_DATA_OUT    GPIO_NUM_17;
+#define I2S_PIN_BUILTIN_WORD_SELECT GPIO_NUM_18;
+#define I2S_PIN_BUILTIN_BIT_CLOCK   GPIO_NUM_0; // boot button
+
 
 /**
  * @brief LCD SCREEN Function Definition

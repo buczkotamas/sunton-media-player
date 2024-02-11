@@ -31,7 +31,9 @@
         "map": "c",
         "sd_card_browser.h": "c",
         "volume_window.h": "c",
-        "ui.h": "c"
+        "ui.h": "c",
+        "tunein.h": "c",
+        "config_panel.h": "c"
     },
     "idf.flashType": "UART",
     "idf.portWin": "COM3"

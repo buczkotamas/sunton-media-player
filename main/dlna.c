@@ -130,8 +130,8 @@ static int dlna_renderer_request(esp_dlna_handle_t dlna, const upnp_attr_t *attr
         {
             tmp_data = metadata_duration_get();
         }
-        ESP_LOGD(TAG, "GetMediaInfo or CurrentMediaDuration notify, reply = %02d:%02d:%02d", tmp_data / 3600, tmp_data / 60, tmp_data % 60);
-        return snprintf(buffer, max_buffer_len, "%02d:%02d:%02d", tmp_data / 3600, tmp_data / 60, tmp_data % 60);
+        ESP_LOGD(TAG, "GetMediaInfo or CurrentMediaDuration notify, reply = %02d:%02d:%02d", tmp_data / 3600, (tmp_data % 3600) / 60, tmp_data % 60);
+        return snprintf(buffer, max_buffer_len, "%02d:%02d:%02d", tmp_data / 3600, (tmp_data % 3600) / 60, tmp_data % 60);
     case AVT_GET_TRACK_NO:
         return snprintf(buffer, max_buffer_len, "%d", 1);
     case AVT_GET_TRACK_METADATA:
@@ -141,7 +141,7 @@ static int dlna_renderer_request(esp_dlna_handle_t dlna, const upnp_attr_t *attr
     case AVT_GET_POS_RELTIME:
         player_audio_time_get(&tmp_data);
         ESP_LOGD(TAG, "GetPositionInfo or RelativeTimePosition notify, reply = %02d:%02d:%02d", tmp_data / 3600, tmp_data / 60, tmp_data % 60);
-        return snprintf(buffer, max_buffer_len, "%02d:%02d:%02d", tmp_data / 3600, tmp_data / 60, tmp_data % 60);
+        return snprintf(buffer, max_buffer_len, "%02d:%02d:%02d", tmp_data / 3600, (tmp_data % 3600) / 60, tmp_data % 60);
     case AVT_GET_POS_ABSCOUNT:
     case AVT_GET_POS_RELCOUNT:
         player_audio_position_get(&tmp_data);

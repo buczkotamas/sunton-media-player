@@ -9,10 +9,11 @@
 #include "http_client.h"
 #include "img_download.h"
 #include "player.h"
-#include "tunein.h"
+#include "tunein_browser.h"
 #include "dlna.h"
 #include "sd_card_browser.h"
 #include "volume_window.h"
+#include "config_panel.h"
 #include "ui.h"
 
 static const char *TAG = "DISPLAY";
@@ -82,7 +83,7 @@ static void button_event_handler(lv_event_t *e)
             id = lv_btnmatrix_get_selected_btn(target);
             int volume = 0;
             player_volume_get(&volume);
-            volume += id == 0 ? -5 : 5;
+            volume += id == 0 ? -1 : 1;
             if (volume > 100)
                 volume = 100;
             if (volume < 0)
@@ -192,13 +193,13 @@ static void set_audio_time(int32_t time)
 {
     audio_time = time;
     lv_slider_set_value(audio_time_slider, time, LV_ANIM_ON);
-    lv_label_set_text_fmt(audio_time_label, "%02ld:%02ld:%02ld", time / 3600, time / 60, time % 60);
+    lv_label_set_text_fmt(audio_time_label, "%02ld:%02ld:%02ld", time / 3600, (time % 3600) / 60, time % 60);
 }
 
 static void set_audio_duration(int32_t duration)
 {
     lv_slider_set_range(audio_time_slider, 0, duration < 1 ? 1 : duration);
-    lv_label_set_text_fmt(audio_duration_label, "%02ld:%02ld:%02ld", duration / 3600, duration / 60, duration % 60);
+    lv_label_set_text_fmt(audio_duration_label, "%02ld:%02ld:%02ld", duration / 3600, (duration % 3600) / 60, duration % 60);
 }
 
 static void handle_audio_stop()
@@ -445,6 +446,9 @@ void display_lvgl_start(void)
 
     lv_obj_t *sd_card_browser = sd_card_browser_create(sdcard_tab, sd_card_browser_cb);
     lv_obj_set_size(sd_card_browser, LV_PCT(100), LV_PCT(100));
+
+    lv_obj_t *config_panel = config_panel_create(settings_tab);
+    lv_obj_set_size(config_panel, LV_PCT(100), LV_PCT(100));
 
     lv_obj_t *footer = lv_obj_create(home_tab);
     lv_obj_set_size(footer, LV_PCT(100), UI_MEDIA_FOOTER_HIGHT);

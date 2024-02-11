@@ -16,8 +16,7 @@ static void timer_handle(lv_timer_t *timer)
 static void voulme_window_create(void)
 {
     vol_window = lv_obj_create(lv_layer_top());
-    lv_obj_set_style_pad_top(vol_window, 0, LV_PART_MAIN);
-    lv_obj_set_size(vol_window, 256, 120);
+    lv_obj_set_size(vol_window, 256, 100);
     lv_obj_add_flag(vol_window, LV_OBJ_FLAG_HIDDEN);
     lv_obj_center(vol_window);
     //
@@ -27,12 +26,11 @@ static void voulme_window_create(void)
     lv_obj_set_width(vol_label, 180);
     lv_obj_set_style_text_align(vol_label, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_align(vol_label, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_center(vol_label);
     //
     vol_slider = lv_slider_create(vol_window);
     lv_slider_set_range(vol_slider, 0, 100);
     lv_obj_set_size(vol_slider, 180, 6);
-    lv_obj_align(vol_slider, LV_ALIGN_BOTTOM_MID, 0, -8);
+    lv_obj_align(vol_slider, LV_ALIGN_BOTTOM_MID, 0, 0);
 }
 void volume_window_show(int volume)
 {

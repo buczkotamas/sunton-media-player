@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "cJSON.h"
-#include "tunein.h"
+#include "tunein_browser.h"
 #include "http_client.h"
 #include "player.h"
 #include "img_download.h"
