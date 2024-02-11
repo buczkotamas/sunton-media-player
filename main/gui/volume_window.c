@@ -32,6 +32,7 @@ static void voulme_window_create(void)
     lv_obj_set_size(vol_slider, 180, 6);
     lv_obj_align(vol_slider, LV_ALIGN_BOTTOM_MID, 0, 0);
 }
+
 void volume_window_show(int volume)
 {
     if (vol_window == NULL)
