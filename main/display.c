@@ -406,6 +406,7 @@ void display_lvgl_start(void)
 
     static lv_style_t style_btn;
     lv_style_init(&style_btn);
+    lv_style_set_text_font(&style_btn, UI_FONT_XL);
     lv_style_set_border_width(&style_btn, 1);
     lv_style_set_border_opa(&style_btn, LV_OPA_50);
     lv_style_set_border_color(&style_btn, lv_palette_main(LV_PALETTE_GREY));

@@ -10,6 +10,7 @@ set(COMPONENT_SRCS
     "metadata.c"
     "gui/tunein_browser.c"
     "http_client.c"
+    "user_config.c"
     "gui/sd_card_browser.c"
     "gui/volume_window.c"
     "gui/config_panel.c"

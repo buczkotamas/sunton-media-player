@@ -7,6 +7,7 @@
 #include "fatfs_stream.h"
 
 #include "player.h"
+#include "user_config.h"
 #include "display.h"
 #include "board.h"
 
@@ -147,6 +148,7 @@ esp_err_t player_volume_set(int volume)
         volume = 100;
     if (volume < 0)
         volume = 0;
+    config_set_audio_volume(volume);
     return i2s_stream_volume_set(i2s_stream_handle, volume);
 }
 
@@ -336,7 +338,7 @@ esp_audio_handle_t player_init(void)
     esp_audio_callback_set(player, esp_audio_callback, NULL);
 
     // Set default volume
-    esp_audio_vol_set(player, 16);
+    esp_audio_vol_set(player, config_get_audio_volume());
 
     return player;
 }

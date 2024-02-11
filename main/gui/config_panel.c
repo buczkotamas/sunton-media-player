@@ -1,9 +1,8 @@
 #include "config_panel.h"
+#include "user_config.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_check.h"
-#include "nvs_flash.h"
-#include "nvs.h"
 
 static lv_obj_t *conf_panel = NULL;
 static lv_obj_t *i2s_dropdown = NULL;
@@ -12,45 +11,22 @@ static lv_obj_t *vol_slider = NULL;
 
 static const char *TAG = "CONFIG_PANEL";
 
-static esp_err_t save_config(void)
+static void save_config(void)
 {
-    nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("config", NVS_READWRITE, &nvs_handle);
-    ESP_RETURN_ON_ERROR(err, TAG, "Error opening NVS");
-
     uint8_t i2s_output = lv_dropdown_get_selected(i2s_dropdown);
-    err = nvs_set_u8(nvs_handle, "i2s_output", i2s_output);
-    ESP_RETURN_ON_ERROR(err, TAG, "Cannot save i2s_output value");
-
-    err = nvs_commit(nvs_handle);
-    ESP_RETURN_ON_ERROR(err, TAG, "Cannot commit NVS");
-    nvs_close(nvs_handle);
-
-    return ESP_OK;
+    config_set_i2s_output(i2s_output);
 }
 
-static esp_err_t load_config(void)
+static void load_config(void)
 {
-    nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("config", NVS_READWRITE, &nvs_handle);
-    ESP_RETURN_ON_ERROR(err, TAG, "Error opening NVS");
-
-    uint8_t i2s_output = 0;
-    err = nvs_get_u8(nvs_handle, "i2s_output", &i2s_output);
-    ESP_RETURN_ON_ERROR(err, TAG, "Cannot load i2s_output value");
+    uint8_t i2s_output = config_get_i2s_output();
     lv_dropdown_set_selected(i2s_dropdown, i2s_output);
-
-    nvs_close(nvs_handle);
-    return ESP_OK;
 }
 
 static void event_handler(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t *obj = lv_event_get_target(e);
-    if (obj == i2s_dropdown && code == LV_EVENT_VALUE_CHANGED)
-    {
-    }
     if (obj == btn_save_and_restart && code == LV_EVENT_CLICKED)
     {
         save_config();
