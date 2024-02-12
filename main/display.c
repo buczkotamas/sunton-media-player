@@ -14,6 +14,7 @@
 #include "sd_card_browser.h"
 #include "volume_window.h"
 #include "config_panel.h"
+#include "user_config.h"
 #include "ui.h"
 
 static const char *TAG = "DISPLAY";
@@ -22,8 +23,6 @@ static esp_audio_handle_t player = NULL;
 
 static lcd_backlight_state_t lcd_backlight_state = LCD_BACKLIGHT_FULL;
 static lv_timer_t *lcd_backlight_timer = NULL;
-
-static lv_timer_t *wifi_signal_update_timer = NULL;
 
 static lv_timer_t *audio_time_increment_timer = NULL;
 static int32_t audio_time = 0;
@@ -44,7 +43,6 @@ static lv_obj_t *audio_title_label;
 static lv_obj_t *audio_album_label;
 static lv_obj_t *audio_artist_label;
 static lv_obj_t *media_source_image;
-static lv_obj_t *wifi_label;
 
 static const char *CTRL_BTN_MAP_PLAY[] = {LV_SYMBOL_PREV, LV_SYMBOL_STOP, LV_SYMBOL_PLAY, LV_SYMBOL_NEXT, NULL};
 static const char *CTRL_BTN_MAP_PAUSE[] = {LV_SYMBOL_PREV, LV_SYMBOL_STOP, LV_SYMBOL_PAUSE, LV_SYMBOL_NEXT, NULL};
@@ -217,7 +215,7 @@ static void handle_audio_stop()
 // Technical things
 //-----------------------------------------------------------------------------------------------------------------
 
-static void lcd_backlight_set_duty(uint32_t target_duty, int max_fade_time_ms)
+void lcd_backlight_set_duty(uint32_t target_duty, int max_fade_time_ms)
 {
     ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, LCD_BACKLIGHT_CHANNEL, target_duty, max_fade_time_ms);
     ledc_fade_start(LEDC_LOW_SPEED_MODE, LCD_BACKLIGHT_CHANNEL, LEDC_FADE_NO_WAIT);
@@ -229,21 +227,20 @@ void lvgl_touchpad_feedback_cb(lv_indev_drv_t *, uint8_t event)
     {
         if (lcd_backlight_state != LCD_BACKLIGHT_FULL)
         {
-            lcd_backlight_set_duty(LCD_BACKLIGHT_FULL_DUTY, 1000);
+            lcd_backlight_set_duty(config_get_backlight_full(), 1000);
             lcd_backlight_state = LCD_BACKLIGHT_FULL;
         }
-        ESP_LOGD(TAG, "Reset LCD backlight timer");
-        lv_timer_reset(lcd_backlight_timer);
+        if (lcd_backlight_timer != NULL)
+        {
+            ESP_LOGD(TAG, "Reset LCD backlight timer");
+            lv_timer_reset(lcd_backlight_timer);
+        }
     }
 }
 
 static void timer_handle(lv_timer_t *timer)
 {
-    if (timer == wifi_signal_update_timer)
-    {
-        lv_label_set_text_fmt(wifi_label, "%s %d %%", LV_SYMBOL_WIFI, http_client_wifi_signal_quality_get());
-    }
-    else if (timer == audio_time_increment_timer)
+    if (timer == audio_time_increment_timer)
     {
         set_audio_time(++audio_time);
     }
@@ -258,7 +255,7 @@ static void timer_handle(lv_timer_t *timer)
             break;
         case LCD_BACKLIGHT_FULL:
             ESP_LOGD(TAG, "Change LCD backlight to DIMM");
-            lcd_backlight_set_duty(LCD_BACKLIGHT_DIMM_DUTY, 3000);
+            lcd_backlight_set_duty(config_get_backlight_dimm(), 3000);
             lcd_backlight_state = LCD_BACKLIGHT_DIMM;
             break;
         case LCD_BACKLIGHT_OFF:
@@ -454,15 +451,7 @@ void display_lvgl_start(void)
     lv_obj_t *footer = lv_obj_create(home_tab);
     lv_obj_set_size(footer, LV_PCT(100), UI_MEDIA_FOOTER_HIGHT);
     lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, 0);
-
-    wifi_label = lv_label_create(home_tab);
-    lv_obj_set_style_text_font(wifi_label, UI_FONT_S, 0);
-    lv_label_set_long_mode(wifi_label, LV_LABEL_LONG_WRAP);
-    lv_label_set_text_fmt(wifi_label, "%s %d %%", LV_SYMBOL_WIFI, http_client_wifi_signal_quality_get());
-    lv_obj_set_width(wifi_label, 48);
-    lv_obj_set_style_text_align(wifi_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align_to(wifi_label, home_tab, LV_ALIGN_TOP_LEFT, 10, 10);
-
+  
     audio_artist_label = lv_label_create(home_tab);
     lv_obj_set_style_text_font(audio_artist_label, UI_FONT_S, 0);
     lv_label_set_long_mode(audio_artist_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
@@ -572,8 +561,6 @@ void display_lvgl_start(void)
 
     metadata_add_event_listener(metadata_cb);
     player_add_event_listener(player_event_cb);
-
-    wifi_signal_update_timer = lv_timer_create(timer_handle, 10 * 1000, NULL);
 }
 
 static void lcd_backlight_init()
@@ -594,9 +581,11 @@ static void lcd_backlight_init()
     ledc_timer_config(&ledc_timer);
     ledc_fade_func_install(0);
     ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
-    lcd_backlight_set_duty(LCD_BACKLIGHT_FULL_DUTY, 1000);
-
-    lcd_backlight_timer = lv_timer_create(timer_handle, LCD_BACKLIGHT_TIMER_MS, NULL);
+    lcd_backlight_set_duty(config_get_backlight_full(), 1000);
+    uint32_t period = config_get_backlight_timer();
+    ESP_LOGD(TAG, "Backlight timer period = %ld", period);
+    if (period != 0)
+        lcd_backlight_timer = lv_timer_create(timer_handle, config_get_backlight_timer(), NULL);
 }
 
 esp_err_t display_lvgl_init(esp_lcd_handle_t esp_lcd, esp_audio_handle_t audio_handle)
