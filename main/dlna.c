@@ -94,7 +94,7 @@ static int dlna_renderer_request(esp_dlna_handle_t dlna, const upnp_attr_t *attr
             .url = buffer,
         };
         player_source_set(&source);
-        player_play();
+        //player_play();
         return 0;
     case AVT_SET_TRACK_METADATA:
         ESP_LOGD(TAG, "SetAVTransportURI, CurrentURIMetaData = %s", buffer);

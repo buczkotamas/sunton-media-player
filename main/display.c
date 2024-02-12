@@ -196,6 +196,7 @@ static void set_audio_time(int32_t time)
 
 static void set_audio_duration(int32_t duration)
 {
+    ESP_LOGD(TAG, "set_audio_duration = %ld", duration);
     lv_slider_set_range(audio_time_slider, 0, duration < 1 ? 1 : duration);
     lv_label_set_text_fmt(audio_duration_label, "%02ld:%02ld:%02ld", duration / 3600, (duration % 3600) / 60, duration % 60);
 }
@@ -299,7 +300,8 @@ static void player_event_cb(player_event_t event, void *subject)
             player_audio_duration_get(&duration);
             if (duration != 0)
                 set_audio_duration(duration);
-
+            else
+                set_audio_duration(metadata_duration_get());
             int time = 0;
             player_audio_time_get(&time);
             set_audio_time(time);
@@ -451,7 +453,7 @@ void display_lvgl_start(void)
     lv_obj_t *footer = lv_obj_create(home_tab);
     lv_obj_set_size(footer, LV_PCT(100), UI_MEDIA_FOOTER_HIGHT);
     lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, 0);
-  
+
     audio_artist_label = lv_label_create(home_tab);
     lv_obj_set_style_text_font(audio_artist_label, UI_FONT_S, 0);
     lv_label_set_long_mode(audio_artist_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
