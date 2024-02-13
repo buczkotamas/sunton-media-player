@@ -48,9 +48,9 @@ static const char *CTRL_BTN_MAP_PLAY[] = {LV_SYMBOL_PREV, LV_SYMBOL_STOP, LV_SYM
 static const char *CTRL_BTN_MAP_PAUSE[] = {LV_SYMBOL_PREV, LV_SYMBOL_STOP, LV_SYMBOL_PAUSE, LV_SYMBOL_NEXT, NULL};
 static const char *CTRL_BTN_MAP_WARNING[] = {LV_SYMBOL_PREV, LV_SYMBOL_STOP, LV_SYMBOL_WARNING, LV_SYMBOL_NEXT, NULL};
 
-LV_IMG_DECLARE(dlna_160x44);
-LV_IMG_DECLARE(tunein_160x44);
-LV_IMG_DECLARE(microsd_160x44);
+LV_IMG_DECLARE(dlna_140x40);
+LV_IMG_DECLARE(tunein_140x40);
+LV_IMG_DECLARE(microsd_140x40);
 
 static void sd_card_browser_cb(char *url);
 
@@ -347,15 +347,15 @@ static void player_event_cb(player_event_t event, void *subject)
         switch (source->type)
         {
         case MP_SOURCE_TYPE_DLNA:
-            lv_img_set_src(media_source_image, &dlna_160x44);
+            lv_img_set_src(media_source_image, &dlna_140x40);
             lv_obj_clear_flag(media_source_image, LV_OBJ_FLAG_HIDDEN);
             break;
         case MP_SOURCE_TYPE_TUNE_IN:
-            lv_img_set_src(media_source_image, &tunein_160x44);
+            lv_img_set_src(media_source_image, &tunein_140x40);
             lv_obj_clear_flag(media_source_image, LV_OBJ_FLAG_HIDDEN);
             break;
         case MP_SOURCE_TYPE_SD_CARD:
-            lv_img_set_src(media_source_image, &microsd_160x44);
+            lv_img_set_src(media_source_image, &microsd_140x40);
             lv_obj_clear_flag(media_source_image, LV_OBJ_FLAG_HIDDEN);
         default:
             break;
@@ -557,7 +557,7 @@ void display_lvgl_start(void)
 
     media_source_image = lv_img_create(footer);
     lv_obj_align(media_source_image, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-    lv_obj_set_size(media_source_image, 160, 44);
+    lv_obj_set_size(media_source_image, 140, 40);
 
     lvgl_port_unlock();
 

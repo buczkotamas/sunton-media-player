@@ -22,11 +22,11 @@ void app_main()
     // esp_log_level_set(TAG, ESP_LOG_DEBUG);
     // esp_log_level_set("DISPLAY", ESP_LOG_DEBUG);
     // esp_log_level_set("LGFX_DISPLAY", ESP_LOG_DEBUG);
-     esp_log_level_set("METADATA", ESP_LOG_DEBUG);
-    // esp_log_level_set("PLAYER", ESP_LOG_DEBUG);
+    esp_log_level_set("METADATA", ESP_LOG_DEBUG);
+    esp_log_level_set("PLAYER", ESP_LOG_DEBUG);
     // esp_log_level_set("BUTTONS", ESP_LOG_DEBUG);
-    //esp_log_level_set("DLNA", ESP_LOG_DEBUG);
-    // esp_log_level_set("IMG_DOWNLOAD", ESP_LOG_DEBUG);
+    esp_log_level_set("DLNA", ESP_LOG_DEBUG);
+    esp_log_level_set("IMG_DOWNLOAD", ESP_LOG_DEBUG);
     // esp_log_level_set("LVGL", ESP_LOG_DEBUG);
     // esp_log_level_set("JPEG", ESP_LOG_DEBUG);
     // esp_log_level_set("HTTP_STREAM", ESP_LOG_DEBUG);
@@ -48,15 +48,17 @@ void app_main()
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
     periph_wifi_cfg_t wifi_cfg = {
-        .ssid = "BRFKlehallgatokocsi01",
-        .password = "32202102",
+        //.ssid = "BRFKlehallgatokocsi01",
+        //.password = "32202102",
+        .wifi_config.sta.ssid = "BRFKlehallgatokocsi01",
+        .wifi_config.sta.password = "32202102",
     };
     esp_periph_handle_t wifi_handle = periph_wifi_init(&wifi_cfg);
     esp_periph_start(set, wifi_handle);
     periph_wifi_wait_for_connected(wifi_handle, portMAX_DELAY);
 
     audio_board_sdcard_init(set);
-    
+
     esp_audio_handle_t player = player_init();
 
     ESP_LOGI(TAG, "audio_board_lcd_init...");
@@ -68,7 +70,6 @@ void app_main()
     dlna_start();
 
     buttons_start(set, player);
-
 
     ESP_LOGI(TAG, "END");
 }

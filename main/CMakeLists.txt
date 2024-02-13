@@ -15,9 +15,9 @@ set(COMPONENT_SRCS
     "gui/volume_window.c"
     "gui/config_panel.c"
     
-    "img/dlna_160x44.c"
-    "img/tunein_160x44.c"
-    "img/microsd_160x44.c"
+    "img/dlna_140x40.c"
+    "img/tunein_140x40.c"
+    "img/microsd_140x40.c"
     "img/radio_128x104.c"
     "img/tunein_refresh_128x128.c"
 )
