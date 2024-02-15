@@ -7,6 +7,8 @@
 
 #include "metadata.h"
 
+extern const char* tone_uri[];
+
 typedef enum
 {
     MP_STATE_NO_MEDIA = 0,

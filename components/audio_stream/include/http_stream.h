@@ -96,6 +96,7 @@ typedef struct {
     int                         request_range_size;     /*!< Range size setting for header `Range: bytes=start-end`
                                                              Request full range of resource if set to 0
                                                              Range size bigger than request size is recommended */
+    const char                  *user_agent;            /*!< The User Agent string to send with HTTP requests */
 } http_stream_cfg_t;
 
 #define HTTP_STREAM_TASK_STACK          (6 * 1024)
@@ -117,6 +118,7 @@ typedef struct {
     .multi_out_num = 0,                          \
     .cert_pem  = NULL,                           \
     .crt_bundle_attach = NULL,                   \
+    .user_agent = NULL,                          \
 }
 
 /**

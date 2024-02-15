@@ -125,7 +125,7 @@ esp_err_t download_image(char *url, lv_img_dsc_t *lv_img_dsc)
     ret = jpeg_to_rgb565((uint8_t *)img_buffer, img_size, lv_img_dsc);
     if (ret != ESP_OK)
     {
-        ret = png_to_rgb565((unsigned char *)img_buffer, img_size, lv_img_dsc);
+       // ret = png_to_rgb565((unsigned char *)img_buffer, img_size, lv_img_dsc);
     }
 err:
     if (img_buffer)

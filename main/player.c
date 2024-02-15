@@ -11,6 +11,30 @@
 #include "display.h"
 #include "board.h"
 
+const char* tone_uri[] = {
+   "flash://tone/0_Bt_Reconnect.mp3",
+   "flash://tone/1_Wechat.mp3",
+   "flash://tone/2_Welcome_To_Wifi.mp3",
+   "flash://tone/3_New_Version_Available.mp3",
+   "flash://tone/4_Bt_Success.mp3",
+   "flash://tone/5_Freetalk.mp3",
+   "flash://tone/6_Upgrade_Done.mp3",
+   "flash://tone/7_shutdown.mp3",
+   "flash://tone/8_Alarm.mp3",
+   "flash://tone/9_Wifi_Success.mp3",
+   "flash://tone/10_Under_Smartconfig.mp3",
+   "flash://tone/11_Out_Of_Power.mp3",
+   "flash://tone/12_server_connect.mp3",
+   "flash://tone/13_hello.mp3",
+   "flash://tone/14_new_message.mp3",
+   "flash://tone/15_Please_Retry_Wifi.mp3",
+   "flash://tone/16_please_setting_wifi.mp3",
+   "flash://tone/17_Welcome_To_Bt.mp3",
+   "flash://tone/18_Wifi_Time_Out.mp3",
+   "flash://tone/19_Wifi_Reconnect.mp3",
+   "flash://tone/20_server_disconnect.mp3",
+};
+
 static const char *TAG = "PLAYER";
 
 static const char *esp_audio_status_names[6] = {"UNKNOWN", "RUNNING", "PAUSED", "STOPPED", "FINISHED", "ERROR"};
@@ -273,21 +297,23 @@ esp_audio_handle_t player_init(void)
     i2s_stream_cfg_t i2s_writer = I2S_STREAM_CFG_DEFAULT();
     i2s_writer.type = AUDIO_STREAM_WRITER;
     i2s_writer.stack_in_ext = true;
-    i2s_writer.i2s_config.sample_rate = AUDIO_I2S_SAMPLE_RATE;
+    // i2s_writer.i2s_config.sample_rate = AUDIO_I2S_SAMPLE_RATE;
     i2s_writer.task_core = 1;
     i2s_writer.use_alc = true;
     i2s_writer.volume = -64;
-    i2s_writer.i2s_config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
-    i2s_writer.i2s_config.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
-    i2s_writer.i2s_config.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
-    i2s_writer.i2s_config.communication_format = I2S_COMM_FORMAT_STAND_I2S;
-    i2s_writer.i2s_config.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
-    i2s_writer.i2s_config.dma_buf_count = 8;  // esp-adf = 3
-    i2s_writer.i2s_config.dma_buf_len = 1024; // esp-adf = 300
-    i2s_writer.i2s_config.use_apll = false;
-    i2s_writer.i2s_config.tx_desc_auto_clear = true;
-    i2s_writer.i2s_config.fixed_mclk = I2S_PIN_NO_CHANGE;
-    i2s_writer.i2s_config.bits_per_chan = I2S_BITS_PER_CHAN_DEFAULT;
+    // i2s_writer.i2s_config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
+    // i2s_writer.i2s_config.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
+    // i2s_writer.i2s_config.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
+    // i2s_writer.i2s_config.communication_format = I2S_COMM_FORMAT_STAND_I2S;
+    // i2s_writer.i2s_config.intr_alloc_flags = ESP_INTR_FLAG_LEVEL1;
+    // i2s_writer.i2s_config.dma_buf_count = 8;  // esp-adf = 3
+    // i2s_writer.i2s_config.dma_buf_len = 1024; // esp-adf = 300
+    i2s_writer.chan_cfg.dma_desc_num = 8;
+    i2s_writer.chan_cfg.dma_frame_num = 512;
+    // i2s_writer.i2s_config.use_apll = false;
+    // i2s_writer.i2s_config.tx_desc_auto_clear = true;
+    // i2s_writer.i2s_config.fixed_mclk = I2S_PIN_NO_CHANGE;
+    // i2s_writer.i2s_config.bits_per_chan = I2S_BITS_PER_CHAN_DEFAULT;
     i2s_writer.out_rb_size = AUDIO_RINGBUFFER_SIZE; // mod
     i2s_writer.buffer_len = 12 * 1024;              // mod
     i2s_writer.task_prio = 4;                       // mod
@@ -315,7 +341,11 @@ esp_audio_handle_t player_init(void)
     esp_audio_input_stream_add(player, http_stream_reader);
 
     audio_decoder_t auto_decode[] = {
+        DEFAULT_ESP_AMRNB_DECODER_CONFIG(),
+        DEFAULT_ESP_AMRWB_DECODER_CONFIG(),
         DEFAULT_ESP_FLAC_DECODER_CONFIG(),
+        DEFAULT_ESP_OGG_DECODER_CONFIG(),
+        DEFAULT_ESP_OPUS_DECODER_CONFIG(),
         DEFAULT_ESP_MP3_DECODER_CONFIG(),
         DEFAULT_ESP_WAV_DECODER_CONFIG(),
         DEFAULT_ESP_AAC_DECODER_CONFIG(),
@@ -324,7 +354,7 @@ esp_audio_handle_t player_init(void)
     };
     esp_decoder_cfg_t auto_dec_cfg = DEFAULT_ESP_DECODER_CONFIG();
     auto_dec_cfg.out_rb_size = AUDIO_RINGBUFFER_SIZE;
-    esp_audio_codec_lib_add(player, AUDIO_CODEC_TYPE_DECODER, esp_decoder_init(&auto_dec_cfg, auto_decode, 5));
+    esp_audio_codec_lib_add(player, AUDIO_CODEC_TYPE_DECODER, esp_decoder_init(&auto_dec_cfg, auto_decode, 10));
 
     esp_audio_output_stream_add(player, i2s_stream_handle);
 

@@ -3,6 +3,14 @@
     "idf.portWin": "COM3",
     "idf.flashType": "UART",
     "files.associations": {
-        "esp_check.h": "c"
+        "esp_check.h": "c",
+        "algorithm_stream.h": "c",
+        "audio_player_int_tone.h": "c",
+        "i2s_stream.h": "c",
+        "mp3_decoder.h": "c",
+        "tone_stream.h": "c",
+        "tone_partition.h": "c",
+        "esp_http_client.h": "c",
+        "metadata.h": "c"
     },
 }

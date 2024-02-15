@@ -8,6 +8,8 @@
 #include "media_lib_adapter.h"
 #include "audio_idf_version.h"
 
+#include "tone_stream.h"
+
 #include "metadata.h"
 #include "display.h"
 #include "dlna.h"
@@ -70,6 +72,15 @@ void app_main()
     dlna_start();
 
     buttons_start(set, player);
+
+    if (false)
+    {
+        tone_stream_cfg_t tn_reader = TONE_STREAM_CFG_DEFAULT();
+        tn_reader.type = AUDIO_STREAM_READER;
+        tn_reader.task_core = 1;
+        esp_audio_input_stream_add(player, tone_stream_init(&tn_reader));
+        esp_audio_play(player, AUDIO_CODEC_TYPE_DECODER, tone_uri[13], 0);
+    }
 
     ESP_LOGI(TAG, "END");
 }

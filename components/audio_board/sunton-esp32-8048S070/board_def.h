@@ -26,7 +26,7 @@
 #define FUNC_AUDIO_CODEC_EN     (0)
 #define BOARD_PA_GAIN           (10) /* Power amplifier gain defined by board (dB) */
 #define AUDIO_SAMPLE_RATE       44100
-#define AUDIO_I2S_SAMPLE_RATE   AUDIO_SAMPLE_RATE
+//#define AUDIO_I2S_SAMPLE_RATE   AUDIO_SAMPLE_RATE
 #define AUDIO_RESAMPLE_RATE     AUDIO_SAMPLE_RATE
 #define AUDIO_RINGBUFFER_SIZE   (512 * 1024)
 
