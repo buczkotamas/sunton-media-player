@@ -35,6 +35,11 @@ esp_err_t http_client_get(char *url, char **response_buffer, int *response_size,
     *response_size = 0;
     *response_buffer = NULL;
 
+    if (!heap_caps_check_integrity_all(true))
+        ESP_LOGE(TAG, "Heap corruption detected! - http_client_get");
+    else
+        ESP_LOGI(TAG, "Heap corruption not detected! - http_client_get");
+
     esp_http_client_config_t config = {
         .url = url,
     };

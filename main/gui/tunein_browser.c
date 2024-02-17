@@ -7,6 +7,7 @@
 #include "http_client.h"
 #include "player.h"
 #include "img_download.h"
+#include "volume_window.h"
 #include "ui.h"
 
 #define HTTP_RESPONSE_MAX_SIZE 128 * 1024
@@ -16,17 +17,16 @@ static const char *URL_BASE = "https://opml.radiotime.com/Tune.ashx?id=";
 static const char *URL_FAVORITES = "https://api.tunein.com/profiles/me/follows?folderId=f1&filter=favorites&serial=9a451e82-6daf-48cf-abdc-9192fda47a63&partnerId=RadioTime";
 // static const char *URL_NOW_PLAYING = "https://feed.tunein.com/profiles/%s/nowPlaying";
 
+static lv_obj_t *active_station_button = NULL;
+static char *active_station_guide_id = NULL;
 static lv_obj_t *station_list = NULL;
 static radio_station_t *radio_stations = NULL;
 static int radio_stations_size = 0;
-lv_event_cb_t button_event_cb;
 
 LV_IMG_DECLARE(radio_128x104);
 LV_IMG_DECLARE(tunein_refresh_128x128);
 
-static void refresh(void);
-
-esp_err_t tunein_stream_url_get(radio_station_t *radio_station)
+static esp_err_t tunein_stream_url_get(radio_station_t *radio_station)
 {
     esp_err_t ret = ESP_OK;
     int http_res_size;
@@ -83,6 +83,48 @@ err:
     return ret;
 }
 
+// listen only for LV_EVENT_VALUE_CHANGED
+static void station_button_handler(lv_event_t *e)
+{
+    lv_obj_t *target = lv_event_get_target(e);
+    bool checked = lv_obj_has_state(target, LV_STATE_CHECKED);
+    if (checked)
+    {
+        loading_window_show("Connecting...");
+        radio_station_t *radio_station = (radio_station_t *)e->user_data;
+
+        if (active_station_button != NULL)
+            lv_obj_clear_state(active_station_button, LV_STATE_CHECKED);
+        active_station_button = target;
+        if (active_station_guide_id != NULL)
+            free(active_station_guide_id);
+        active_station_guide_id = strdup(radio_station->guide_id);
+
+        if (tunein_stream_url_get(radio_station) == ESP_OK)
+        {
+            media_sourece_t source = {
+                .type = MP_SOURCE_TYPE_TUNE_IN,
+                .url = radio_station->stream_url,
+            };
+            player_source_set(&source);
+            player_play();
+            metadata_set(radio_station->title, radio_station->title, radio_station->stream_url, 0, radio_station->stream_url, radio_station->image_url);
+        }
+        else
+        {
+            loading_window_hide();
+        }
+    }
+    else if (active_station_button == target)
+    {
+        if (active_station_guide_id != NULL)
+            free(active_station_guide_id);
+        active_station_guide_id = NULL;
+        active_station_button = NULL;
+        player_stop();
+    }
+}
+
 static esp_err_t tunein_favorites_get(radio_station_t **stations, int *count)
 {
     esp_err_t ret = ESP_OK;
@@ -91,7 +133,18 @@ static esp_err_t tunein_favorites_get(radio_station_t **stations, int *count)
     cJSON *json_root = NULL;
     *stations = NULL;
 
+    if (!heap_caps_check_integrity_all(true))
+        ESP_LOGE(TAG, "Heap corruption detected! - tunein_favorites_get - 1");
+    else
+        ESP_LOGI(TAG, "Heap corruption not detected! - tunein_favorites_get - 1");
+
     ret = http_client_get(URL_FAVORITES, &http_response, &http_res_size, HTTP_RESPONSE_MAX_SIZE);
+
+    if (!heap_caps_check_integrity_all(true))
+        ESP_LOGE(TAG, "Heap corruption detected! - tunein_favorites_get - 2");
+    else
+        ESP_LOGI(TAG, "Heap corruption not detected! - tunein_favorites_get - 2");
+
     ESP_GOTO_ON_ERROR(ret, err, TAG, "Cannot download TuneIn favorites");
 
     cJSON *json_station = NULL;
@@ -124,25 +177,16 @@ static esp_err_t tunein_favorites_get(radio_station_t **stations, int *count)
         radio_stations[i].description = NULL;
 
         if (cJSON_IsString(title) && title->valuestring != NULL)
-        {
             radio_stations[i].title = strdup(title->valuestring);
-        }
         if (cJSON_IsString(guide_id) && guide_id->valuestring != NULL)
-        {
             radio_stations[i].guide_id = strdup(guide_id->valuestring);
-        }
         if (cJSON_IsString(subtitle) && subtitle->valuestring != NULL)
-        {
             radio_stations[i].subtitle = strdup(subtitle->valuestring);
-        }
         if (cJSON_IsString(description) && description->valuestring != NULL)
-        {
             radio_stations[i].description = strdup(description->valuestring);
-        }
         if (cJSON_IsString(image_url) && image_url->valuestring != NULL)
-        {
             radio_stations[i].image_url = strdup(image_url->valuestring);
-        }
+
         i++;
     }
 
@@ -158,6 +202,12 @@ err:
     {
         free(http_response);
     }
+
+    if (!heap_caps_check_integrity_all(true))
+        ESP_LOGE(TAG, "Heap corruption detected! - tunein_favorites_get - end");
+    else
+        ESP_LOGI(TAG, "Heap corruption not detected! - tunein_favorites_get - end");
+
     return ret;
 }
 
@@ -167,7 +217,7 @@ err:
 
 static void refresh_button_handler(lv_event_t *e)
 {
-    refresh();
+    tunein_browser_refresh();
 }
 
 static void add_refresh_button(int item_count)
@@ -187,15 +237,41 @@ static void add_refresh_button(int item_count)
     lv_obj_set_style_bg_img_src(button, &tunein_refresh_128x128, 0);
 }
 
-static void refresh(void)
+static void free_radio_station_list()
 {
-    lv_obj_clean(station_list);
     if (radio_stations != NULL)
     {
+        for (int i = 0; i < radio_stations_size; i++)
+        {
+            if (radio_stations[i].guide_id != NULL)
+                free(radio_stations[i].guide_id);
+            if (radio_stations[i].stream_url != NULL)
+                free(radio_stations[i].stream_url);
+            if (radio_stations[i].image_url != NULL)
+                free(radio_stations[i].image_url);
+            if (radio_stations[i].title != NULL)
+                free(radio_stations[i].title);
+            if (radio_stations[i].subtitle != NULL)
+                free(radio_stations[i].subtitle);
+            if (radio_stations[i].description != NULL)
+                free(radio_stations[i].description);
+        }
         free(radio_stations);
         radio_stations = NULL;
+        radio_stations_size = 0;
     }
-    radio_stations_size = 0;
+}
+
+void tunein_browser_refresh(void)
+{
+    if (!heap_caps_check_integrity_all(true))
+        ESP_LOGE(TAG, "Heap corruption detected! - tunein_browser_refresh - 1");
+    else
+        ESP_LOGI(TAG, "Heap corruption not detected! - tunein_browser_refresh - 1");
+
+    loading_window_show(NULL);
+    lv_obj_clean(station_list);
+    free_radio_station_list();
     if (tunein_favorites_get(&radio_stations, &radio_stations_size) == ESP_OK)
     {
         lv_coord_t *col_dsc = (lv_coord_t *)malloc((COL_COUNT + 1) * sizeof(lv_coord_t));
@@ -211,7 +287,7 @@ static void refresh(void)
         {
             row_dsc[i] = BUTTON_SIZE;
         }
-        row_dsc[radio_stations_size] = LV_GRID_TEMPLATE_LAST;
+        row_dsc[ROW_COUNT] = LV_GRID_TEMPLATE_LAST;
 
         ESP_LOGD(TAG, "radio_stations_size=%d, COL_COUNT=%d, ROW_COUNT=%d", radio_stations_size, COL_COUNT, ROW_COUNT);
 
@@ -225,16 +301,28 @@ static void refresh(void)
         lv_obj_t *canvas;
         void *canvas_buffer;
 
+        if (!heap_caps_check_integrity_all(true))
+            ESP_LOGE(TAG, "Heap corruption detected! - tunein_browser_refresh - 2");
+        else
+            ESP_LOGI(TAG, "Heap corruption not detected! - tunein_browser_refresh - 2");
+
         for (int i = 0; i < radio_stations_size; i++)
         {
+            loading_window_show_fmt("Loading %d/%d", radio_stations_size, i + 1);
+
             uint8_t col = i % COL_COUNT;
             uint8_t row = i / COL_COUNT;
 
             ESP_LOGD(TAG, "title=%s, i=%d, col=%d, row=%d", radio_stations[i].title, i, col, row);
 
             button = lv_btn_create(station_list);
-            lv_obj_add_event_cb(button, button_event_cb, LV_EVENT_CLICKED, &radio_stations[i]);
+            lv_obj_add_flag(button, LV_OBJ_FLAG_CHECKABLE);
+            lv_obj_add_event_cb(button, station_button_handler, LV_EVENT_VALUE_CHANGED, &radio_stations[i]);
             lv_obj_set_grid_cell(button, LV_GRID_ALIGN_STRETCH, col, 1, LV_GRID_ALIGN_STRETCH, row, 1);
+            if (active_station_guide_id != NULL && strcmp(active_station_guide_id, radio_stations[i].guide_id) == 0)
+            {
+                lv_obj_add_state(button, LV_STATE_CHECKED);
+            }
 
             lv_img_dsc_t station_image = {
                 .data = NULL,
@@ -274,13 +362,40 @@ static void refresh(void)
         }
     }
     add_refresh_button(radio_stations_size);
+    loading_window_hide();
 }
 
-lv_obj_t *tunein_browser_create(lv_obj_t *parent, lv_event_cb_t event_cb)
+static void player_event_cb(player_event_t event, void *subject)
 {
-    button_event_cb = event_cb;
+    if (event == MP_EVENT_STATE)
+    {
+        player_state_t *player_state = (player_state_t *)subject;
+        ESP_LOGI(TAG, "event = %d, player_state = %d", event, *player_state);
+        if (*player_state == MP_STATE_PLAYING || *player_state == MP_STATE_ERROR)
+        {
+            loading_window_hide();
+        }
+    }
+    else if (event == MP_EVENT_SOURCE)
+    {
+        media_sourece_t *source = (media_sourece_t *)subject;
+        if (source->type != MP_SOURCE_TYPE_TUNE_IN)
+        {
+            if (active_station_button != NULL)
+                lv_obj_clear_state(active_station_button, LV_STATE_CHECKED);
+            active_station_button = NULL;
+            if (active_station_guide_id != NULL)
+                free(active_station_guide_id);
+            active_station_guide_id = NULL;
+        }
+    }
+}
+
+lv_obj_t *tunein_browser_create(lv_obj_t *parent)
+{
     station_list = lv_obj_create(parent);
     lv_obj_set_style_pad_all(station_list, UI_PADDING_ALL, LV_PART_MAIN);
     add_refresh_button(0);
+    player_add_event_listener(player_event_cb);
     return station_list;
 }

@@ -2,6 +2,7 @@
 #include "esp_check.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "esp_random.h"
 
 #include "board.h"
 #include "img_download.h"
@@ -47,6 +48,7 @@ esp_err_t jpeg_to_rgb565(uint8_t *jpeg_buffer, size_t jpeg_buffer_size, lv_img_d
 
 esp_err_t png_to_rgb565(unsigned char *png_buffer, size_t png_buffer_size, lv_img_dsc_t *lv_img_dsc)
 {
+    ESP_LOGI(TAG, "lodepng_decode24...");
     unsigned width, height;
     uint8_t *rgb888 = NULL;
     uint16_t *rgb565 = NULL;
@@ -91,6 +93,62 @@ esp_err_t png_to_rgb565(unsigned char *png_buffer, size_t png_buffer_size, lv_im
     return ESP_OK;
 }
 
+esp_err_t load_image_from_cache(char *url, lv_img_dsc_t *lv_img_dsc)
+{
+    esp_err_t ret = ESP_OK;
+    FILE *f_img = NULL;
+    FILE *f_index = NULL;
+    char *img_buffer = NULL;
+
+    f_index = fopen("/sdcard/.img_cache/index", "r");
+    ESP_GOTO_ON_FALSE(f_index != NULL, ESP_ERR_NOT_FOUND, err, TAG, "Cannot open cache index file");
+
+    char line[1024];
+    while (fgets(line, 1024, f_index))
+    {
+        char *token = strtok(line, ",");
+        if (token)
+        {
+            if (strcmp(url, token) == 0)
+            {
+                lv_img_dsc->header.cf = LV_IMG_CF_TRUE_COLOR;
+                lv_img_dsc->header.w = atoi(strtok(NULL, ","));
+                lv_img_dsc->header.h = atoi(strtok(NULL, ","));
+                lv_img_dsc->data_size = atoi(strtok(NULL, ","));
+                char *id = strtok(NULL, ",");
+                ESP_LOGI(TAG, "Image from url %s found in cache with id: %s", url, id);
+                char img_file_name[128];
+                strcpy(img_file_name, "/sdcard/.img_cache/");
+                strcat(img_file_name, id);
+                f_img = fopen(img_file_name, "r");
+                img_buffer = malloc(lv_img_dsc->data_size);
+                ESP_GOTO_ON_FALSE(img_buffer != NULL, ESP_ERR_NO_MEM, err, TAG, "Cannot allocate memmory for file load into PSRAM");
+                int read = fread(img_buffer, lv_img_dsc->data_size, 1, f_img);
+                ESP_GOTO_ON_FALSE(read == 1, ESP_FAIL, err, TAG, "Cannot read the whole file");
+                lv_img_dsc->data = (uint8_t *)img_buffer;
+            }
+        }
+    }
+    if (f_img == NULL)
+    {
+        ESP_LOGI(TAG, "Canot find cached image for url %s", url);
+        ret = ESP_ERR_NOT_FOUND;
+    }
+err:
+    if (f_index != NULL)
+        fclose(f_index);
+    if (f_img != NULL)
+        fclose(f_img);
+    if (ret != ESP_OK && img_buffer != NULL)
+        free(img_buffer);
+    return ret;
+}
+
+esp_err_t save_image_to_cache(char *url, lv_img_dsc_t *lv_img_dsc)
+{
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
 esp_err_t download_image(char *url, lv_img_dsc_t *lv_img_dsc)
 {
     ESP_LOGI(TAG, "Download image from %s", url);
@@ -125,7 +183,7 @@ esp_err_t download_image(char *url, lv_img_dsc_t *lv_img_dsc)
     ret = jpeg_to_rgb565((uint8_t *)img_buffer, img_size, lv_img_dsc);
     if (ret != ESP_OK)
     {
-       // ret = png_to_rgb565((unsigned char *)img_buffer, img_size, lv_img_dsc);
+        ret = png_to_rgb565((unsigned char *)img_buffer, img_size, lv_img_dsc);
     }
 err:
     if (img_buffer)

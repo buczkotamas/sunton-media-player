@@ -52,8 +52,6 @@ LV_IMG_DECLARE(dlna_140x40);
 LV_IMG_DECLARE(tunein_140x40);
 LV_IMG_DECLARE(microsd_140x40);
 
-static void sd_card_browser_cb(char *url);
-
 static void slider_event_handler(lv_event_t *e)
 {
     lv_obj_t *target = lv_event_get_target(e);
@@ -165,21 +163,6 @@ err:
     if (cover_art_image.data)
         free(cover_art_image.data);
     return ret;
-}
-
-static void tunein_browser_cb(lv_event_t *e)
-{
-    radio_station_t *radio_station = (radio_station_t *)e->user_data;
-    if (tunein_stream_url_get(radio_station) == ESP_OK)
-    {
-        media_sourece_t source = {
-            .type = MP_SOURCE_TYPE_TUNE_IN,
-            .url = radio_station->stream_url,
-        };
-        player_source_set(&source);
-        player_play();
-        metadata_set(radio_station->title, radio_station->title, radio_station->stream_url, 0, radio_station->stream_url, radio_station->image_url);
-    }
 }
 
 static void mute_set(bool mute)
@@ -372,29 +355,6 @@ static void player_event_cb(player_event_t event, void *subject)
     }
 }
 
-static void sd_card_browser_cb(char *url)
-{
-    char *cover = NULL;
-    char *slash = strrchr(url, '/');
-    if (slash)
-    {
-        int folder_length = slash - url;
-        cover = malloc(folder_length + 10 + 1); // "/cover.jpg" + '/0'
-        strncpy(cover, url, folder_length);
-        strcpy(cover + folder_length, "/cover.jpg");
-    }
-    media_sourece_t source = {
-        .type = MP_SOURCE_TYPE_SD_CARD,
-        .url = url,
-    };
-    player_source_set(&source);
-    player_play();
-    int duration = 0;
-    player_audio_duration_get(&duration);
-    metadata_set(url, "SD Card", "", duration, url, cover);
-    if (cover != NULL)
-        free(cover);
-}
 
 void display_lvgl_start(void)
 {
@@ -441,10 +401,10 @@ void display_lvgl_start(void)
     lv_obj_clear_flag(lv_tabview_get_content(tabview), LV_OBJ_FLAG_SCROLLABLE);
 
     /*Home tab */
-    lv_obj_t *radio_station_list = tunein_browser_create(tunein_tab, tunein_browser_cb);
+    lv_obj_t *radio_station_list = tunein_browser_create(tunein_tab);
     lv_obj_set_size(radio_station_list, LV_PCT(100), LV_PCT(100));
 
-    lv_obj_t *sd_card_browser = sd_card_browser_create(sdcard_tab, sd_card_browser_cb);
+    lv_obj_t *sd_card_browser = sd_card_browser_create(sdcard_tab);
     lv_obj_set_size(sd_card_browser, LV_PCT(100), LV_PCT(100));
 
     lv_obj_t *config_panel = config_panel_create(settings_tab);

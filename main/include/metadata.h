@@ -39,7 +39,7 @@ char *metadata_album_get(void);
 char *metadata_artist_get(void);
 int metadata_duration_get(void);
 char *metadata_stream_url_get(void);
-char *metadata_image_url_get(cvoid);
+char *metadata_image_url_get(void);
 
 void metadata_set(char *title,
                   char *album,

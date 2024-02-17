@@ -14,7 +14,7 @@ typedef struct
     char *description;
 } radio_station_t;
 
-esp_err_t tunein_stream_url_get(radio_station_t *radio_station);
-lv_obj_t *tunein_browser_create(lv_obj_t *parent, lv_event_cb_t event_cb);
+void tunein_browser_refresh(void);
+lv_obj_t *tunein_browser_create(lv_obj_t *parent);
 
 #endif

@@ -32,17 +32,40 @@ static lv_obj_t *file_list = NULL;
 static lv_obj_t *dir_up_button = NULL;
 static const char *root = SD_MOUNT_POINT;
 static char *current_path = NULL;
-static lv_file_browser_select_cb file_select_cb;
 
 playlist_operator_handle_t sdcard_list_handle = NULL;
 
 static esp_err_t list_directory(char *path);
 
+static void play(char *url)
+{
+    char *cover = NULL;
+    char *slash = strrchr(url, '/');
+    if (slash)
+    {
+        int folder_length = slash - url;
+        cover = malloc(folder_length + 10 + 1); // "/cover.jpg" + '/0'
+        strncpy(cover, url, folder_length);
+        strcpy(cover + folder_length, "/cover.jpg");
+    }
+    media_sourece_t source = {
+        .type = MP_SOURCE_TYPE_SD_CARD,
+        .url = url,
+    };
+    player_source_set(&source);
+    player_play();
+    int duration = 0;
+    player_audio_duration_get(&duration);
+    metadata_set(url, "SD Card", "", duration, url, cover);
+    if (cover != NULL)
+        free(cover);
+}
+
 esp_err_t sd_card_browser_next(void)
 {
     char *url = NULL;
     ESP_RETURN_ON_ERROR(sdcard_list_next(sdcard_list_handle, 1, &url), TAG, "Cannot get next track from playlist");
-    (file_select_cb)(url);
+    play(url);
     return ESP_OK;
 }
 
@@ -50,7 +73,7 @@ esp_err_t sd_card_browser_prev(void)
 {
     char *url = NULL;
     ESP_RETURN_ON_ERROR(sdcard_list_prev(sdcard_list_handle, 1, &url), TAG, "Cannot get previous track from playlist");
-    (file_select_cb)(url);
+    play(url);
     return ESP_OK;
 }
 
@@ -58,7 +81,7 @@ static void file_button_handler(lv_event_t *e)
 {
     char *url;
     sdcard_list_choose(sdcard_list_handle, (int)e->user_data, &url);
-    (file_select_cb)(url);
+    play(url);
 }
 
 static void dir_button_handler(lv_event_t *e)
@@ -181,16 +204,12 @@ void sdcard_url_save_cb(void *user_data, char *url)
         ESP_LOGE(TAG, "Fail to save sdcard url to sdcard playlist");
 }
 
-lv_obj_t *sd_card_browser_create(lv_obj_t *parent, lv_file_browser_select_cb select_cb)
+lv_obj_t *sd_card_browser_create(lv_obj_t *parent)
 {
     file_list = lv_list_create(parent);
-    file_select_cb = select_cb;
-
     sdcard_list_create(&sdcard_list_handle);
     sdcard_scan(sdcard_url_save_cb, root, 3, (const char *[]){"mp3", "wav", "flac", "aac", "m4a"}, 5, sdcard_list_handle);
     sdcard_list_show(sdcard_list_handle);
-
     list_directory(root);
-
     return file_list;
 }
