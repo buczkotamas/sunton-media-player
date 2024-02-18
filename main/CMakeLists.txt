@@ -12,8 +12,9 @@ set(COMPONENT_SRCS
     "http_client.c"
     "user_config.c"
     "gui/sd_card_browser.c"
-    "gui/volume_window.c"
+    "gui/msg_window.c"
     "gui/config_panel.c"
+    "gui/gui.c"
     
     "img/dlna_140x40.c"
     "img/tunein_140x40.c"

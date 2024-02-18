@@ -66,7 +66,7 @@ esp_audio_handle_t player_init(void);
 void player_source_set(media_sourece_t *source);
 media_sourece_t *player_source_get(void);
 
-void player_play(void);
+audio_err_t player_play(void);
 void player_stop(void);
 void player_pause(void);
 void player_seek(int position);

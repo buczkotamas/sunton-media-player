@@ -11,28 +11,28 @@
 #include "display.h"
 #include "board.h"
 
-const char* tone_uri[] = {
-   "flash://tone/0_Bt_Reconnect.mp3",
-   "flash://tone/1_Wechat.mp3",
-   "flash://tone/2_Welcome_To_Wifi.mp3",
-   "flash://tone/3_New_Version_Available.mp3",
-   "flash://tone/4_Bt_Success.mp3",
-   "flash://tone/5_Freetalk.mp3",
-   "flash://tone/6_Upgrade_Done.mp3",
-   "flash://tone/7_shutdown.mp3",
-   "flash://tone/8_Alarm.mp3",
-   "flash://tone/9_Wifi_Success.mp3",
-   "flash://tone/10_Under_Smartconfig.mp3",
-   "flash://tone/11_Out_Of_Power.mp3",
-   "flash://tone/12_server_connect.mp3",
-   "flash://tone/13_hello.mp3",
-   "flash://tone/14_new_message.mp3",
-   "flash://tone/15_Please_Retry_Wifi.mp3",
-   "flash://tone/16_please_setting_wifi.mp3",
-   "flash://tone/17_Welcome_To_Bt.mp3",
-   "flash://tone/18_Wifi_Time_Out.mp3",
-   "flash://tone/19_Wifi_Reconnect.mp3",
-   "flash://tone/20_server_disconnect.mp3",
+const char *tone_uri[] = {
+    "flash://tone/0_Bt_Reconnect.mp3",
+    "flash://tone/1_Wechat.mp3",
+    "flash://tone/2_Welcome_To_Wifi.mp3",
+    "flash://tone/3_New_Version_Available.mp3",
+    "flash://tone/4_Bt_Success.mp3",
+    "flash://tone/5_Freetalk.mp3",
+    "flash://tone/6_Upgrade_Done.mp3",
+    "flash://tone/7_shutdown.mp3",
+    "flash://tone/8_Alarm.mp3",
+    "flash://tone/9_Wifi_Success.mp3",
+    "flash://tone/10_Under_Smartconfig.mp3",
+    "flash://tone/11_Out_Of_Power.mp3",
+    "flash://tone/12_server_connect.mp3",
+    "flash://tone/13_hello.mp3",
+    "flash://tone/14_new_message.mp3",
+    "flash://tone/15_Please_Retry_Wifi.mp3",
+    "flash://tone/16_please_setting_wifi.mp3",
+    "flash://tone/17_Welcome_To_Bt.mp3",
+    "flash://tone/18_Wifi_Time_Out.mp3",
+    "flash://tone/19_Wifi_Reconnect.mp3",
+    "flash://tone/20_server_disconnect.mp3",
 };
 
 static const char *TAG = "PLAYER";
@@ -130,14 +130,16 @@ player_state_t player_state_get(void)
     return player_state;
 }
 
-void player_play(void)
+audio_err_t player_play(void)
 {
     esp_audio_state_t state = {0};
-    esp_audio_state_get(player, &state);
+    audio_err_t ret = esp_audio_state_get(player, &state);
+    ESP_RETURN_ON_ERROR(ret, TAG, "Cannot get player state. Error code: %d", ret);
     if (state.status == AUDIO_STATUS_PAUSED)
     {
         ESP_LOGD(TAG, "Resume");
-        esp_audio_resume(player);
+        ret = esp_audio_resume(player);
+        ESP_RETURN_ON_ERROR(ret, TAG, "Cannot resume. Error code: %d", ret);
     }
     else if (media_sourece.url != NULL)
     {
@@ -147,12 +149,19 @@ void player_play(void)
             player_state = MP_STATE_TRANSITIONING;
             fire_event(MP_EVENT_STATE, &player_state);
         }
-        esp_audio_play(player, AUDIO_CODEC_TYPE_DECODER, media_sourece.url, 0);
+        ret = esp_audio_play(player, AUDIO_CODEC_TYPE_DECODER, media_sourece.url, 0);
+        if (ret != ESP_OK)
+        {
+            player_state = MP_STATE_ERROR;
+            fire_event(MP_EVENT_STATE, &player_state);
+        }
+        ESP_RETURN_ON_ERROR(ret, TAG, "Cannot play url:%s Error code: %d", media_sourece.url, ret);
     }
     else
     {
         ESP_LOGW(TAG, "Play command recieved but no streaming URL set");
     }
+    return ret;
 }
 
 static esp_err_t i2s_stream_volume_set(audio_element_handle_t i2s_stream, int volume)

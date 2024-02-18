@@ -1,5 +1,5 @@
-#ifndef UI_H
-#define UI_H
+#ifndef GUI_H
+#define GUI_H
 
 #define UI_PADDING_ALL 8
 
@@ -15,5 +15,8 @@ static const lv_font_t *UI_FONT_S = &lv_font_montserrat_18;
 static const lv_font_t *UI_FONT_M = &lv_font_montserrat_20;
 static const lv_font_t *UI_FONT_L = &lv_font_montserrat_22;
 static const lv_font_t *UI_FONT_XL = &lv_font_montserrat_24;
+
+lv_style_t *gui_style_btnmatrix_main(void);
+lv_style_t *gui_style_btnmatrix_items(void);
 
 #endif

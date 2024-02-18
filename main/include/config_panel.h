@@ -1,7 +1,7 @@
 #ifndef CONFIG_PANEL_H
 #define CONFIG_PANEL_H
 
-#include "ui.h"
+#include "gui.h"
 #include "esp_err.h"
 #include "esp_lvgl_port.h"
 

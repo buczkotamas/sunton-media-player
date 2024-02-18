@@ -2,6 +2,7 @@
 #define USER_CONFIG_H
 
 #include "esp_err.h"
+#include <stdbool.h>
 
 uint8_t config_get_i2s_output();
 esp_err_t config_set_i2s_output(uint8_t value);
@@ -17,5 +18,8 @@ esp_err_t config_set_backlight_dimm(uint8_t value);
 
 uint32_t config_get_backlight_timer();
 esp_err_t config_set_backlight_timer(uint32_t value);
+
+bool config_get_scan_card_on_boot();
+esp_err_t config_set_scan_card_on_boot(bool value);
 
 #endif

@@ -11,12 +11,14 @@
 #define CONF_KEY_BACKLIGHT_FULL "backlight_full"
 #define CONF_KEY_BACKLIGHT_DIMM "backlight_dimm"
 #define CONF_KEY_BACKLIGHT_TIMER "backlight_timer"
+#define CONF_KEY_SCAN_SD_ON_BOOT "scan_on_boot"
 
 #define CONF_DEF_VAL_I2S_OUT 0
 #define CONF_DEF_VAL_AUDIO_VOL 20
 #define CONF_DEF_VAL_BACKLIGHT_FULL 255
 #define CONF_DEF_VAL_BACKLIGHT_DIMM 32
 #define CONF_DEF_VAL_BACKLIGHT_TIMER 1000 * 60 * 5
+#define CONF_DEF_VAL_SCAN_SD_ON_BOOT 0
 
 static esp_err_t config_set_u8(char *key, uint8_t value)
 {
@@ -99,4 +101,13 @@ uint32_t config_get_backlight_timer()
 esp_err_t config_set_backlight_timer(uint32_t value)
 {
     return config_set_u32(CONF_KEY_BACKLIGHT_TIMER, value);
+}
+
+bool config_get_scan_card_on_boot()
+{
+    return config_get_u8(CONF_KEY_SCAN_SD_ON_BOOT, CONF_DEF_VAL_SCAN_SD_ON_BOOT) == 1;
+}
+esp_err_t config_set_scan_card_on_boot(bool value)
+{
+    return config_set_u8(CONF_KEY_SCAN_SD_ON_BOOT, value ? 1 : 0);
 }

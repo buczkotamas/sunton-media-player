@@ -7,8 +7,8 @@
 #include "http_client.h"
 #include "player.h"
 #include "img_download.h"
-#include "volume_window.h"
-#include "ui.h"
+#include "msg_window.h"
+#include "gui.h"
 
 #define HTTP_RESPONSE_MAX_SIZE 128 * 1024
 
@@ -90,7 +90,7 @@ static void station_button_handler(lv_event_t *e)
     bool checked = lv_obj_has_state(target, LV_STATE_CHECKED);
     if (checked)
     {
-        loading_window_show("Connecting...");
+        msg_window_show_text("Connecting...");
         radio_station_t *radio_station = (radio_station_t *)e->user_data;
 
         if (active_station_button != NULL)
@@ -100,19 +100,22 @@ static void station_button_handler(lv_event_t *e)
             free(active_station_guide_id);
         active_station_guide_id = strdup(radio_station->guide_id);
 
-        if (tunein_stream_url_get(radio_station) == ESP_OK)
+        esp_err_t url_ret = tunein_stream_url_get(radio_station);
+        if (url_ret == ESP_OK)
         {
             media_sourece_t source = {
                 .type = MP_SOURCE_TYPE_TUNE_IN,
                 .url = radio_station->stream_url,
             };
             player_source_set(&source);
-            player_play();
             metadata_set(radio_station->title, radio_station->title, radio_station->stream_url, 0, radio_station->stream_url, radio_station->image_url);
+            audio_err_t play_ret = player_play();
+            if (play_ret != ESP_OK)
+                msg_window_show_ok("%s  Player error: %d", LV_SYMBOL_WARNING, play_ret);
         }
         else
         {
-            loading_window_hide();
+            msg_window_show_ok("%s  TuneIn get URL error: %d", LV_SYMBOL_WARNING, url_ret);
         }
     }
     else if (active_station_button == target)
@@ -269,7 +272,7 @@ void tunein_browser_refresh(void)
     else
         ESP_LOGI(TAG, "Heap corruption not detected! - tunein_browser_refresh - 1");
 
-    loading_window_show(NULL);
+    msg_window_show_text("Loading...");
     lv_obj_clean(station_list);
     free_radio_station_list();
     if (tunein_favorites_get(&radio_stations, &radio_stations_size) == ESP_OK)
@@ -308,7 +311,7 @@ void tunein_browser_refresh(void)
 
         for (int i = 0; i < radio_stations_size; i++)
         {
-            loading_window_show_fmt("Loading %d/%d", radio_stations_size, i + 1);
+            msg_window_show_text("Loading %d/%d", radio_stations_size, i + 1);
 
             uint8_t col = i % COL_COUNT;
             uint8_t row = i / COL_COUNT;
@@ -362,7 +365,7 @@ void tunein_browser_refresh(void)
         }
     }
     add_refresh_button(radio_stations_size);
-    loading_window_hide();
+    msg_window_hide();
 }
 
 static void player_event_cb(player_event_t event, void *subject)
@@ -373,7 +376,8 @@ static void player_event_cb(player_event_t event, void *subject)
         ESP_LOGI(TAG, "event = %d, player_state = %d", event, *player_state);
         if (*player_state == MP_STATE_PLAYING || *player_state == MP_STATE_ERROR)
         {
-            loading_window_hide();
+            ESP_LOGI(TAG, "Hide loading window [ Connecting... ]");
+            msg_window_hide();
         }
     }
     else if (event == MP_EVENT_SOURCE)

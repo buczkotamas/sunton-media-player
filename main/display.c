@@ -12,10 +12,10 @@
 #include "tunein_browser.h"
 #include "dlna.h"
 #include "sd_card_browser.h"
-#include "volume_window.h"
+#include "msg_window.h"
 #include "config_panel.h"
 #include "user_config.h"
-#include "ui.h"
+#include "gui.h"
 
 static const char *TAG = "DISPLAY";
 
@@ -86,7 +86,7 @@ static void button_event_handler(lv_event_t *e)
                 volume = 0;
             player_volume_set(volume);
 
-            volume_window_show(volume);
+            msg_window_show_volume(volume);
         }
         if (target == ctrl_btn_mtrx)
         {
@@ -355,7 +355,6 @@ static void player_event_cb(player_event_t event, void *subject)
     }
 }
 
-
 void display_lvgl_start(void)
 {
     lvgl_port_lock(0);
@@ -404,7 +403,7 @@ void display_lvgl_start(void)
     lv_obj_t *radio_station_list = tunein_browser_create(tunein_tab);
     lv_obj_set_size(radio_station_list, LV_PCT(100), LV_PCT(100));
 
-    lv_obj_t *sd_card_browser = sd_card_browser_create(sdcard_tab);
+    lv_obj_t *sd_card_browser = sd_card_browser_create(sdcard_tab, config_get_scan_card_on_boot());
     lv_obj_set_size(sd_card_browser, LV_PCT(100), LV_PCT(100));
 
     lv_obj_t *config_panel = config_panel_create(settings_tab);
@@ -474,47 +473,25 @@ void display_lvgl_start(void)
     lv_obj_align(audio_duration_label, LV_ALIGN_TOP_RIGHT, 0, -5);
 
     /* volume button matrix */
-    static lv_style_t style_vol_bg;
-    lv_style_init(&style_vol_bg);
-    lv_style_set_pad_all(&style_vol_bg, 0);
-    lv_style_set_pad_gap(&style_vol_bg, 0);
-    lv_style_set_clip_corner(&style_vol_bg, true);
-    lv_style_set_border_color(&style_vol_bg, lv_palette_main(LV_PALETTE_GREY));
-    lv_style_set_border_width(&style_vol_bg, 1);
-    lv_style_set_radius(&style_vol_bg, LV_RADIUS_CIRCLE);
-    lv_style_set_text_font(&style_vol_bg, UI_FONT_L);
-
-    static lv_style_t style_vol_btn;
-    lv_style_init(&style_vol_btn);
-    lv_style_set_radius(&style_vol_btn, 0);
-    lv_style_set_border_width(&style_vol_btn, 1);
-    lv_style_set_border_opa(&style_vol_btn, LV_OPA_50);
-    lv_style_set_border_color(&style_vol_btn, lv_palette_main(LV_PALETTE_GREY));
-    lv_style_set_border_side(&style_vol_btn, LV_BORDER_SIDE_INTERNAL);
-    lv_style_set_radius(&style_vol_btn, 0);
-
     static const char *map[] = {LV_SYMBOL_VOLUME_MID, LV_SYMBOL_VOLUME_MAX, NULL};
-
     vol_btn_mtrx = lv_btnmatrix_create(footer);
     lv_btnmatrix_set_map(vol_btn_mtrx, map);
-    lv_obj_add_style(vol_btn_mtrx, &style_vol_bg, LV_PART_MAIN);
-    lv_obj_add_style(vol_btn_mtrx, &style_vol_btn, LV_PART_ITEMS);
+    lv_obj_add_style(vol_btn_mtrx, gui_style_btnmatrix_main(), LV_PART_MAIN);
+    lv_obj_add_style(vol_btn_mtrx, gui_style_btnmatrix_items(), LV_PART_ITEMS);
     lv_obj_add_event_cb(vol_btn_mtrx, button_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_set_size(vol_btn_mtrx, 48 * 3, 48);
-
     lv_obj_align(vol_btn_mtrx, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-    /* volume button matrix */
+
     /* control button matrix */
     ctrl_btn_mtrx = lv_btnmatrix_create(footer);
     lv_btnmatrix_set_map(ctrl_btn_mtrx, CTRL_BTN_MAP_PLAY);
-    lv_obj_add_style(ctrl_btn_mtrx, &style_vol_bg, LV_PART_MAIN);
-    lv_obj_add_style(ctrl_btn_mtrx, &style_vol_btn, LV_PART_ITEMS);
+    lv_obj_add_style(ctrl_btn_mtrx, gui_style_btnmatrix_main(), LV_PART_MAIN);
+    lv_obj_add_style(ctrl_btn_mtrx, gui_style_btnmatrix_items(), LV_PART_ITEMS);
     lv_obj_add_event_cb(ctrl_btn_mtrx, button_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_set_size(ctrl_btn_mtrx, 48 * 6, 48);
-
     lv_obj_align(ctrl_btn_mtrx, LV_ALIGN_BOTTOM_MID, 0, 0);
-    /* control button matrix */
 
+    /* media source icon */
     media_source_image = lv_img_create(footer);
     lv_obj_align(media_source_image, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
     lv_obj_set_size(media_source_image, 140, 40);

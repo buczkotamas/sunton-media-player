@@ -204,12 +204,31 @@ void sdcard_url_save_cb(void *user_data, char *url)
         ESP_LOGE(TAG, "Fail to save sdcard url to sdcard playlist");
 }
 
-lv_obj_t *sd_card_browser_create(lv_obj_t *parent)
+static void scan_sd_card(void)
 {
-    file_list = lv_list_create(parent);
-    sdcard_list_create(&sdcard_list_handle);
     sdcard_scan(sdcard_url_save_cb, root, 3, (const char *[]){"mp3", "wav", "flac", "aac", "m4a"}, 5, sdcard_list_handle);
     sdcard_list_show(sdcard_list_handle);
     list_directory(root);
+}
+
+static void scan_button_handler(lv_event_t *e)
+{
+    scan_sd_card();
+}
+
+lv_obj_t *sd_card_browser_create(lv_obj_t *parent, bool scan)
+{
+    file_list = lv_list_create(parent);
+    sdcard_list_create(&sdcard_list_handle);
+    if (!scan)
+    {
+        lv_obj_t *button = lv_list_add_btn(file_list, LV_SYMBOL_REFRESH, "Scan Memory Card");
+        lv_obj_add_event_cb(button, scan_button_handler, LV_EVENT_CLICKED, NULL);
+        lv_group_remove_obj(button);
+    }
+    else
+    {
+        scan_sd_card();
+    }
     return file_list;
 }
