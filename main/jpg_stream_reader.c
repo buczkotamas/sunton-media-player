@@ -9,7 +9,7 @@
 
 static const char *TAG = "JPG_STREAM_READER";
 static char *stream_url;
-static char header_buffer[HEADER_BUFFER_SIZE] = {0};
+static char header_buffer[64] = {0};
 
 static TaskHandle_t th_download = NULL;
 

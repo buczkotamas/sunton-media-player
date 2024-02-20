@@ -18,7 +18,7 @@ static void on_frame_cb(uint16_t *data, esp_jpeg_image_output_t img)
 
 static void start_cam_view()
 {
-    esp_err_t init = jpg_stream_open("http://192.168.0.51", on_frame_cb);
+    esp_err_t init = jpg_stream_open("http://192.168.0.51?vf=0&hm=1&fs=5&led=1", on_frame_cb);
     ESP_LOGI(TAG, "Camera view init: %d", init);
 }
 
@@ -44,7 +44,7 @@ lv_obj_t *camera_view_create(lv_obj_t *parent)
     cam_image = lv_canvas_create(cam_view_panel);
     lv_obj_set_style_border_color(cam_image, lv_palette_main(LV_PALETTE_GREY), LV_PART_MAIN);
     lv_obj_set_style_border_width(cam_image, 1, LV_PART_MAIN);
-    lv_obj_set_size(cam_image, 240, 240);
+    //lv_obj_set_size(cam_image, 240, 240);
     lv_obj_align(cam_image, LV_ALIGN_TOP_MID, 0, 48);
 
     cam_btn_matrix = lv_btnmatrix_create(cam_view_panel);
