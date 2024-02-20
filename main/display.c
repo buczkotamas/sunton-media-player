@@ -12,6 +12,7 @@
 #include "tunein_browser.h"
 #include "dlna.h"
 #include "sd_card_browser.h"
+#include "camera_view.h"
 #include "msg_window.h"
 #include "config_panel.h"
 #include "user_config.h"
@@ -205,7 +206,7 @@ void lcd_backlight_set_duty(uint32_t target_duty, int max_fade_time_ms)
     ledc_fade_start(LEDC_LOW_SPEED_MODE, LCD_BACKLIGHT_CHANNEL, LEDC_FADE_NO_WAIT);
 }
 
-void lvgl_touchpad_feedback_cb(lv_indev_drv_t *, uint8_t event)
+void lvgl_touchpad_feedback_cb(lv_indev_drv_t *indev_drv, uint8_t event)
 {
     if (event == LV_EVENT_PRESSED || event == LV_EVENT_RELEASED)
     {
@@ -394,6 +395,8 @@ void display_lvgl_start(void)
     lv_obj_add_style(tunein_tab, &style_tab, LV_PART_MAIN);
     lv_obj_t *sdcard_tab = lv_tabview_add_tab(tabview, LV_SYMBOL_SD_CARD);
     lv_obj_add_style(sdcard_tab, &style_tab, LV_PART_MAIN);
+    lv_obj_t *cam_view_tab = lv_tabview_add_tab(tabview, LV_SYMBOL_EYE_OPEN);
+    lv_obj_add_style(cam_view_tab, &style_tab, LV_PART_MAIN);
     lv_obj_t *settings_tab = lv_tabview_add_tab(tabview, LV_SYMBOL_SETTINGS);
     lv_obj_add_style(settings_tab, &style_tab, LV_PART_MAIN);
 
@@ -405,6 +408,9 @@ void display_lvgl_start(void)
 
     lv_obj_t *sd_card_browser = sd_card_browser_create(sdcard_tab, config_get_scan_card_on_boot());
     lv_obj_set_size(sd_card_browser, LV_PCT(100), LV_PCT(100));
+
+    lv_obj_t *cam_view_panel = camera_view_create(cam_view_tab);
+    lv_obj_set_size(cam_view_panel, LV_PCT(100), LV_PCT(100));
 
     lv_obj_t *config_panel = config_panel_create(settings_tab);
     lv_obj_set_size(config_panel, LV_PCT(100), LV_PCT(100));
