@@ -14,9 +14,10 @@ static char header_buffer[64] = {0};
 static TaskHandle_t th_download = NULL;
 
 static esp_http_client_handle_t http_client = NULL;
-static jpg_stream_on_frame_cb on_frame_callback;
+static jpg_stream_event_cb event_cb;
 
 static bool run_jpg_stream = false;
+static bool jpg_stream_closed = true;
 
 esp_err_t close_http_client(void)
 {
@@ -31,7 +32,7 @@ esp_err_t close_http_client(void)
 
 esp_err_t reconnect_http_client(void)
 {
-    ESP_RETURN_ON_ERROR(close_http_client(), TAG, "Cannot set HTTP client GET method");
+    ESP_RETURN_ON_ERROR(close_http_client(), TAG, "Cannot close HTTP client");
     esp_http_client_config_t config = {
         .url = stream_url,
     };
@@ -59,7 +60,7 @@ static void decode_and_display(uint8_t *data, uint32_t size)
     esp_err_t dec_ret = esp_jpeg_decode(&jpeg_cfg, &img);
 
     if (dec_ret == ESP_OK)
-        (on_frame_callback)((uint16_t *)jpeg_cfg.outbuf, img);
+        (event_cb)(JPG_STREAM_EVENT_FRAME, (uint16_t *)jpeg_cfg.outbuf, &img);
 
     if (jpeg_cfg.outbuf != NULL)
         free(jpeg_cfg.outbuf);
@@ -67,10 +68,11 @@ static void decode_and_display(uint8_t *data, uint32_t size)
 
 void download_task(void *p)
 {
+
     if (reconnect_http_client() != ESP_OK)
     {
         ESP_LOGE(TAG, "download_task cannot connect HTTP client");
-        jpg_stream_close();
+        run_jpg_stream = false;
     }
     int content_length = 0;
     while (run_jpg_stream)
@@ -109,11 +111,13 @@ void download_task(void *p)
             if (reconnect_http_client() != ESP_OK)
             {
                 ESP_LOGE(TAG, "download_task cannot reconnect HTTP client!");
-                jpg_stream_close();
+                run_jpg_stream = false;
             }
         }
     }
     close_http_client();
+    jpg_stream_closed = true;
+    (event_cb)(JPG_STREAM_EVENT_CLOSE, NULL, NULL);
     vTaskDelete(NULL);
 }
 
@@ -121,16 +125,23 @@ esp_err_t jpg_stream_close(void)
 {
     ESP_LOGI(TAG, "closing jpg_stream_reader...");
     run_jpg_stream = false;
+    while (jpg_stream_closed == false)
+    {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+    ESP_LOGI(TAG, "jpg_stream_reader closed");
     return ESP_OK;
 }
 
-esp_err_t jpg_stream_open(char *url, jpg_stream_on_frame_cb on_frame_cb)
+esp_err_t jpg_stream_open(char *url, jpg_stream_event_cb stream_event_cb)
 {
     ESP_RETURN_ON_FALSE(run_jpg_stream == false, ESP_FAIL, TAG, "jpg_stream already running");
     run_jpg_stream = true;
+    jpg_stream_closed = false;
     stream_url = url;
-    on_frame_callback = on_frame_cb;
-    BaseType_t ret = xTaskCreate(&download_task, "download_task", 1024 * 4, NULL, 20, &th_download);
+    event_cb = stream_event_cb;
+    BaseType_t ret = xTaskCreate(&download_task, "download_task", 1024 * 6, NULL, 20, &th_download);
     ESP_RETURN_ON_FALSE(ret == pdPASS, ESP_FAIL, TAG, "Cannot create task: download_task, error code: %d", ret);
+    (event_cb)(JPG_STREAM_EVENT_OPEN, NULL, NULL);
     return ESP_OK;
 }
