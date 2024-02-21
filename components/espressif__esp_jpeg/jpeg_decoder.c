@@ -123,6 +123,8 @@ esp_err_t esp_jpeg_decode(esp_jpeg_image_cfg_t *cfg, esp_jpeg_image_output_t *im
     {
         free(outbuf);
         outbuf = NULL;
+        cfg->outbuf_size = 0;
+        cfg->outbuf = NULL;
     }
     ESP_GOTO_ON_FALSE((res == JDR_OK), ESP_FAIL, err, TAG, "Error in decoding JPEG image!");
 

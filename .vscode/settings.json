@@ -9,6 +9,8 @@
         "array": "c",
         "bitset": "c",
         "string_view": "c",
-        "initializer_list": "c"
+        "initializer_list": "c",
+        "*.def": "c",
+        "thread": "c"
     },
 }
