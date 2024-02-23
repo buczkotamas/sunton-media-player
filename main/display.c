@@ -409,8 +409,7 @@ void display_lvgl_start(void)
     lv_obj_t *sd_card_browser = sd_card_browser_create(sdcard_tab, config_get_scan_card_on_boot());
     lv_obj_set_size(sd_card_browser, LV_PCT(100), LV_PCT(100));
 
-    lv_obj_t *cam_view_panel = camera_view_create(cam_view_tab);
-    lv_obj_set_size(cam_view_panel, LV_PCT(100), LV_PCT(100));
+    camera_view_create(cam_view_tab);
 
     lv_obj_t *config_panel = config_panel_create(settings_tab);
     lv_obj_set_size(config_panel, LV_PCT(100), LV_PCT(100));

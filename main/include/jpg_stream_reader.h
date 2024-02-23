@@ -9,6 +9,8 @@ typedef enum
     JPG_STREAM_EVENT_OPEN = 0,
     JPG_STREAM_EVENT_CLOSE = 1,
     JPG_STREAM_EVENT_FRAME = 2,
+    JPG_STREAM_EVENT_ERROR = 3,
+    JPG_STREAM_EVENT_STATUS = 4,
 } jpg_stream_event_t;
 
 typedef void (*jpg_stream_event_cb)(jpg_stream_event_t event, uint16_t *data, esp_jpeg_image_output_t *img);

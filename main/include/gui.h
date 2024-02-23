@@ -19,4 +19,6 @@ static const lv_font_t *UI_FONT_XL = &lv_font_montserrat_24;
 lv_style_t *gui_style_btnmatrix_main(void);
 lv_style_t *gui_style_btnmatrix_items(void);
 
+lv_style_t *gui_style_dropdown(void);
+
 #endif

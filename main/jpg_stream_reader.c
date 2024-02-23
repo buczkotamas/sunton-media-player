@@ -19,18 +19,18 @@ static jpg_stream_event_cb event_cb;
 static bool run_jpg_stream = false;
 static bool jpg_stream_closed = true;
 
-esp_err_t close_http_client(void)
+static esp_err_t close_http_client(void)
 {
     if (http_client != NULL)
     {
-        ESP_RETURN_ON_ERROR(esp_http_client_close(http_client), TAG, "Cannot close HTTP client");
-        ESP_RETURN_ON_ERROR(esp_http_client_cleanup(http_client), TAG, "Cannot cleanup HTTP client");
+        esp_http_client_close(http_client);
+        esp_http_client_cleanup(http_client);
     }
     http_client = NULL;
     return ESP_OK;
 }
 
-esp_err_t reconnect_http_client(void)
+static esp_err_t reconnect_http_client(void)
 {
     ESP_RETURN_ON_ERROR(close_http_client(), TAG, "Cannot close HTTP client");
     esp_http_client_config_t config = {
@@ -68,12 +68,13 @@ static void decode_and_display(uint8_t *data, uint32_t size)
 
 void download_task(void *p)
 {
-
     if (reconnect_http_client() != ESP_OK)
     {
         ESP_LOGE(TAG, "download_task cannot connect HTTP client");
+        (event_cb)(JPG_STREAM_EVENT_ERROR, "Connection error", NULL);
         run_jpg_stream = false;
     }
+    (event_cb)(JPG_STREAM_EVENT_OPEN, NULL, NULL);
     int content_length = 0;
     while (run_jpg_stream)
     {
@@ -111,6 +112,7 @@ void download_task(void *p)
             if (reconnect_http_client() != ESP_OK)
             {
                 ESP_LOGE(TAG, "download_task cannot reconnect HTTP client!");
+                (event_cb)(JPG_STREAM_EVENT_ERROR, "Connection error", NULL);
                 run_jpg_stream = false;
             }
         }
@@ -142,6 +144,5 @@ esp_err_t jpg_stream_open(char *url, jpg_stream_event_cb stream_event_cb)
     event_cb = stream_event_cb;
     BaseType_t ret = xTaskCreate(&download_task, "download_task", 1024 * 6, NULL, 20, &th_download);
     ESP_RETURN_ON_FALSE(ret == pdPASS, ESP_FAIL, TAG, "Cannot create task: download_task, error code: %d", ret);
-    (event_cb)(JPG_STREAM_EVENT_OPEN, NULL, NULL);
     return ESP_OK;
 }

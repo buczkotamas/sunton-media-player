@@ -11,6 +11,7 @@
         "string_view": "c",
         "initializer_list": "c",
         "*.def": "c",
-        "thread": "c"
+        "thread": "c",
+        "functional": "c"
     },
 }
