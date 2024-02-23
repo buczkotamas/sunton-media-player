@@ -4,6 +4,8 @@
 #include "msg_window.h"
 #include "esp_log.h"
 
+static const char *API_KEY = "6c19af28-9aea-41df-a680-b75743cd50ae";
+
 static const char *TAG = "CAMERA_VIEW";
 static const char *PIC_SIZE_ITEMS = "160x120\n176x144\n240x176\n240X240\n320x240\n400x296\n480x320";
 static const int PIC_SIZE_HIGHT[] = {0, 120, 144, 176, 240, 240, 296, 320};
@@ -49,6 +51,7 @@ static void stream_event_cb(jpg_stream_event_t event, uint16_t *data, esp_jpeg_i
         frame_count = 0;
         if (fps_timer == NULL)
             fps_timer = lv_timer_create(timer_handle, 1000, NULL);
+        msg_window_hide();
         break;
     case JPG_STREAM_EVENT_CLOSE:
         lv_btnmatrix_set_map(cam_btn_matrix, CAM_BTN_MAP_PLAY);
@@ -58,6 +61,7 @@ static void stream_event_cb(jpg_stream_event_t event, uint16_t *data, esp_jpeg_i
             lv_timer_del(fps_timer);
         fps_timer = NULL;
         lv_label_set_text_static(info_label, "No camera connected");
+        msg_window_hide();
         break;
     case JPG_STREAM_EVENT_ERROR:
         msg_window_show_ok("%s  %s", LV_SYMBOL_WARNING, (char *)data);
@@ -75,9 +79,10 @@ static void stream_event_cb(jpg_stream_event_t event, uint16_t *data, esp_jpeg_i
 
 static void cam_stream_open()
 {
-    char url[64] = {0};
+    msg_window_show_text("Connecting...");
+    char url[128] = {0};
     lv_dropdown_get_selected_str(cam_select_dropdown, cam_address, 16);
-    sprintf(url, "http://%s?vf=%d&hm=%d&fs=%d&led=%d", cam_address, v_flip, h_flip, pic_size, led);
+    sprintf(url, "http://%s?vf=%d&hm=%d&fs=%d&led=%d&key=%s", cam_address, v_flip, h_flip, pic_size, led, API_KEY);
     esp_err_t ret = jpg_stream_open(url, stream_event_cb);
     ESP_LOGI(TAG, "cam_stream_open [%s] = %d", url, ret);
 
@@ -171,7 +176,7 @@ void camera_view_create(lv_obj_t *parent)
     lv_obj_set_style_text_font(cam_btn_matrix, UI_FONT_M, LV_PART_MAIN);
     lv_obj_add_event_cb(cam_btn_matrix, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_set_size(cam_btn_matrix, 280, 48);
-    lv_obj_align(cam_btn_matrix, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_align(cam_btn_matrix, LV_ALIGN_BOTTOM_MID, 10, 0);
 
     pic_size_dropdown = lv_dropdown_create(footer);
     lv_dropdown_set_options(pic_size_dropdown, PIC_SIZE_ITEMS);
