@@ -34,6 +34,7 @@ void app_main()
     // esp_log_level_set("HTTP_STREAM", ESP_LOG_DEBUG);
     // esp_log_level_set("esp-tls", ESP_LOG_DEBUG);
     // esp_log_level_set("eesp-tls-mbedtls", ESP_LOG_DEBUG);
+    esp_log_level_set("websocket_client", ESP_LOG_DEBUG);
 
     media_lib_add_default_adapter();
 

@@ -5,3 +5,4 @@ dependencies:
   # espressif/esp_lvgl_port: "==1.4.0"
   # esp_jpeg: "==1.0.5"
   espressif/esp_lcd_touch_gt911: "==1.1.0"
+  espressif/esp_websocket_client: "=1.2.2"

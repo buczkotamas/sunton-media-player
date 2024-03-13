@@ -4,6 +4,12 @@
 #include "msg_window.h"
 #include "esp_log.h"
 
+#include "esp_websocket_client.h"
+#include "esp_system.h"
+#include "esp_event.h"
+#include "esp_log.h"
+#include "esp_netif.h"
+
 static const char *API_KEY = "6c19af28-9aea-41df-a680-b75743cd50ae";
 
 static const char *TAG = "CAMERA_VIEW";
@@ -19,6 +25,8 @@ static int led = 0;
 static char cam_address[16] = {0};
 
 static bool is_stream_open = false;
+static lv_obj_t *h_slider = NULL;
+static lv_obj_t *v_slider = NULL;
 static lv_obj_t *cam_select_dropdown = NULL;
 static lv_obj_t *cam_btn_matrix = NULL;
 static lv_obj_t *pic_size_dropdown = NULL;
@@ -26,6 +34,53 @@ static lv_obj_t *cam_image = NULL;
 static lv_obj_t *info_label = NULL;
 static lv_timer_t *fps_timer = NULL;
 static int frame_count = 0;
+
+esp_websocket_client_handle_t client = NULL;
+
+static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
+    switch (event_id)
+    {
+    case WEBSOCKET_EVENT_CONNECTED:
+        ESP_LOGI(TAG, "WEBSOCKET_EVENT_CONNECTED");
+        break;
+    case WEBSOCKET_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG, "WEBSOCKET_EVENT_DISCONNECTED");
+        break;
+    case WEBSOCKET_EVENT_DATA:
+        ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
+        ESP_LOGI(TAG, "Received opcode=%d", data->op_code);
+        if (data->op_code == WS_TRANSPORT_OPCODES_TEXT)
+            ESP_LOGI(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+        break;
+    case WEBSOCKET_EVENT_ERROR:
+        ESP_LOGI(TAG, "WEBSOCKET_EVENT_ERROR");
+        break;
+    }
+}
+
+static void websocket_close()
+{
+    ESP_LOGI(TAG, "Closing websocket if open");
+    if (client != NULL)
+        esp_websocket_client_destroy(client);
+    client = NULL;
+}
+
+static void websocket_open()
+{
+    websocket_close();
+    char url[32] = {0};
+    sprintf(url, "ws://%s/ws", cam_address);
+    ESP_LOGI(TAG, "Connecting to websocket URL: %s", url);
+    esp_websocket_client_config_t websocket_cfg = {
+        .uri = url,
+    };
+    client = esp_websocket_client_init(&websocket_cfg);
+    esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, websocket_event_handler, (void *)client);
+    esp_websocket_client_start(client);
+}
 
 static void timer_handle(lv_timer_t *timer)
 {
@@ -64,7 +119,9 @@ static void stream_event_cb(jpg_stream_event_t event, uint16_t *data, esp_jpeg_i
         msg_window_hide();
         break;
     case JPG_STREAM_EVENT_ERROR:
+        websocket_close();
         msg_window_show_ok("%s  %s", LV_SYMBOL_WARNING, (char *)data);
+        lv_btnmatrix_set_map(cam_btn_matrix, CAM_BTN_MAP_PLAY);
         is_stream_open = false;
         frame_count = 0;
         if (fps_timer != NULL)
@@ -77,12 +134,23 @@ static void stream_event_cb(jpg_stream_event_t event, uint16_t *data, esp_jpeg_i
     }
 }
 
+static void cam_stream_close()
+{
+    websocket_close();
+    jpg_stream_close();
+}
+
 static void cam_stream_open()
 {
     msg_window_show_text("Connecting...");
-    char url[128] = {0};
+
     lv_dropdown_get_selected_str(cam_select_dropdown, cam_address, 16);
-    sprintf(url, "http://%s?vf=%d&hm=%d&fs=%d&led=%d&key=%s", cam_address, v_flip, h_flip, pic_size, led, API_KEY);
+
+    if (!esp_websocket_client_is_connected(client))
+        websocket_open();
+
+    char url[128] = {0};
+    sprintf(url, "http://%s:81?vf=%d&hm=%d&fs=%d&led=%d&key=%s", cam_address, v_flip, h_flip, pic_size, led, API_KEY);
     esp_err_t ret = jpg_stream_open(url, stream_event_cb);
     ESP_LOGI(TAG, "cam_stream_open [%s] = %d", url, ret);
 
@@ -95,7 +163,6 @@ static void cam_stream_open()
 static void button_handler(lv_event_t *e)
 {
     uint16_t btn_id;
-    char *btn_text;
     lv_obj_t *target = lv_event_get_target(e);
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_VALUE_CHANGED)
@@ -106,7 +173,7 @@ static void button_handler(lv_event_t *e)
             if (btn_id == 0)
             {
                 if (is_stream_open)
-                    jpg_stream_close();
+                    cam_stream_close();
                 else
                     cam_stream_open();
                 return;
@@ -126,7 +193,6 @@ static void button_handler(lv_event_t *e)
         else if (target == pic_size_dropdown)
         {
             pic_size = lv_dropdown_get_selected(pic_size_dropdown) + 1;
-            btn_text = lv_btnmatrix_get_btn_text(cam_btn_matrix, 0);
             if (is_stream_open)
             {
                 jpg_stream_close();
@@ -137,9 +203,15 @@ static void button_handler(lv_event_t *e)
         {
             if (is_stream_open)
             {
-                jpg_stream_close();
+                cam_stream_close();
                 cam_stream_open();
             }
+        }
+        else if ((target == h_slider || target == v_slider) && esp_websocket_client_is_connected(client))
+        {
+            char data[8] = {0};
+            sprintf(data, "%s %d", target == h_slider ? "hp" : "vp", (int)lv_slider_get_value(target));
+            esp_websocket_client_send_text(client, data, strlen(data), portMAX_DELAY);
         }
     }
 }
@@ -153,6 +225,20 @@ void camera_view_create(lv_obj_t *parent)
 {
     cam_image = lv_canvas_create(parent);
     lv_obj_align(cam_image, LV_ALIGN_TOP_MID, 0, 32);
+
+    h_slider = lv_slider_create(parent);
+    lv_slider_set_range(h_slider, 0, 180);
+    lv_slider_set_value(h_slider, 90, LV_ANIM_OFF);
+    lv_obj_set_size(h_slider, LV_PCT(90), 6);
+    lv_obj_align(h_slider, LV_ALIGN_BOTTOM_MID, 0, -UI_MEDIA_FOOTER_HIGHT - 16);
+    lv_obj_add_event_cb(h_slider, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
+
+    v_slider = lv_slider_create(parent);
+    lv_slider_set_range(v_slider, 0, 180);
+    lv_slider_set_value(v_slider, 180, LV_ANIM_OFF);
+    lv_obj_set_size(v_slider, 6, 280);
+    lv_obj_align(v_slider, LV_ALIGN_TOP_RIGHT, -16, 16);
+    lv_obj_add_event_cb(v_slider, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
 
     lv_obj_t *footer = lv_obj_create(parent);
     lv_obj_set_size(footer, LV_PCT(100), UI_MEDIA_FOOTER_HIGHT);
