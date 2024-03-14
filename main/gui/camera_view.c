@@ -10,13 +10,23 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 
+// joystick matrix button id's
+#define BTN_UP 1
+#define BTN_LEFT 3
+#define BTN_RIGHT 5
+#define BTN_DOWN 7
+
 static const char *API_KEY = "6c19af28-9aea-41df-a680-b75743cd50ae";
 
 static const char *TAG = "CAMERA_VIEW";
 static const char *PIC_SIZE_ITEMS = "160x120\n176x144\n240x176\n240X240\n320x240\n400x296\n480x320";
 static const int PIC_SIZE_HIGHT[] = {0, 120, 144, 176, 240, 240, 296, 320};
-static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, LV_SYMBOL_REFRESH, LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
-static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, LV_SYMBOL_REFRESH, LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
+static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, NULL};
+static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, NULL};
+// static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, LV_SYMBOL_REFRESH, LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
+// static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, LV_SYMBOL_REFRESH, LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
+static const char *JOYSTICK_BTN_MAP[] = {"0", LV_SYMBOL_UP, "2", "\n", LV_SYMBOL_LEFT, "4", LV_SYMBOL_RIGHT, "\n", "6", LV_SYMBOL_DOWN, "8", NULL};
+static int last_joystick_btn_id = LV_BTNMATRIX_BTN_NONE;
 
 static int h_flip = 0;
 static int v_flip = 0;
@@ -29,6 +39,7 @@ static lv_obj_t *h_slider = NULL;
 static lv_obj_t *v_slider = NULL;
 static lv_obj_t *cam_select_dropdown = NULL;
 static lv_obj_t *cam_btn_matrix = NULL;
+static lv_obj_t *joystick_btn_matrix = NULL;
 static lv_obj_t *pic_size_dropdown = NULL;
 static lv_obj_t *cam_image = NULL;
 static lv_obj_t *info_label = NULL;
@@ -37,6 +48,11 @@ static int frame_count = 0;
 
 esp_websocket_client_handle_t client = NULL;
 
+static void websocket_send(char *msg)
+{
+    esp_websocket_client_send_text(client, msg, strlen(msg), portMAX_DELAY);
+}
+
 static void websocket_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
@@ -44,15 +60,25 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
     {
     case WEBSOCKET_EVENT_CONNECTED:
         ESP_LOGI(TAG, "WEBSOCKET_EVENT_CONNECTED");
+        websocket_send("inf");
         break;
     case WEBSOCKET_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "WEBSOCKET_EVENT_DISCONNECTED");
         break;
     case WEBSOCKET_EVENT_DATA:
         ESP_LOGI(TAG, "WEBSOCKET_EVENT_DATA");
-        ESP_LOGI(TAG, "Received opcode=%d", data->op_code);
         if (data->op_code == WS_TRANSPORT_OPCODES_TEXT)
-            ESP_LOGI(TAG, "Received=%.*s", data->data_len, (char *)data->data_ptr);
+        {
+            char msg[8] = {0};
+            int pos;
+            char id[3];
+            strncpy(msg, data->data_ptr, data->data_len);
+            sscanf(msg, "%s %d", id, &pos);
+            if (strcmp(id, "hp") == 0)
+                lv_slider_set_value(h_slider, pos, LV_ANIM_ON);
+            if (strcmp(id, "vp") == 0)
+                lv_slider_set_value(v_slider, pos, LV_ANIM_ON);
+        }
         break;
     case WEBSOCKET_EVENT_ERROR:
         ESP_LOGI(TAG, "WEBSOCKET_EVENT_ERROR");
@@ -214,6 +240,50 @@ static void button_handler(lv_event_t *e)
             esp_websocket_client_send_text(client, data, strlen(data), portMAX_DELAY);
         }
     }
+
+    if (target == joystick_btn_matrix && esp_websocket_client_is_connected(client))
+    {
+        btn_id = lv_btnmatrix_get_selected_btn(target);
+        ESP_LOGD(TAG, "event_code = %d, btn_id = %d", code, btn_id);
+        if (code == LV_EVENT_PRESSED)
+        {
+            last_joystick_btn_id = btn_id;
+            if (btn_id == BTN_UP)
+                websocket_send("vp 180");
+            else if (btn_id == BTN_DOWN)
+                websocket_send("vp 0");
+            else if (btn_id == BTN_LEFT)
+                websocket_send("hp 0");
+            else if (btn_id == BTN_RIGHT)
+                websocket_send("hp 180");
+        }
+        else if (code == LV_EVENT_RELEASED)
+        {
+            if (btn_id == BTN_UP || btn_id == BTN_DOWN)
+                websocket_send("vp -1");
+            else if (btn_id == BTN_LEFT || btn_id == BTN_RIGHT)
+                websocket_send("hp -1");
+            last_joystick_btn_id = LV_BTNMATRIX_BTN_NONE;
+        }
+        else if (code == LV_EVENT_VALUE_CHANGED)
+        {
+            if (last_joystick_btn_id != LV_BTNMATRIX_BTN_NONE)
+            {
+                if (last_joystick_btn_id == BTN_UP || last_joystick_btn_id == BTN_DOWN)
+                    websocket_send("vp -1");
+                else if (last_joystick_btn_id == BTN_LEFT || last_joystick_btn_id == BTN_RIGHT)
+                    websocket_send("hp -1");
+            }
+            if (btn_id == 1)
+                websocket_send("vp 180");
+            else if (btn_id == 7)
+                websocket_send("vp 0");
+            else if (btn_id == 3)
+                websocket_send("hp 0");
+            else if (btn_id == 5)
+                websocket_send("hp 180");
+        }
+    }
 }
 
 static const char *get_cameras(void)
@@ -231,18 +301,38 @@ void camera_view_create(lv_obj_t *parent)
     lv_slider_set_value(h_slider, 90, LV_ANIM_OFF);
     lv_obj_set_size(h_slider, LV_PCT(90), 6);
     lv_obj_align(h_slider, LV_ALIGN_BOTTOM_MID, 0, -UI_MEDIA_FOOTER_HIGHT - 16);
+    lv_obj_set_style_bg_opa(h_slider, LV_OPA_TRANSP, LV_PART_INDICATOR);
     lv_obj_add_event_cb(h_slider, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
 
     v_slider = lv_slider_create(parent);
     lv_slider_set_range(v_slider, 0, 180);
     lv_slider_set_value(v_slider, 180, LV_ANIM_OFF);
-    lv_obj_set_size(v_slider, 6, 280);
-    lv_obj_align(v_slider, LV_ALIGN_TOP_RIGHT, -16, 16);
+    lv_obj_set_size(v_slider, 6, 256);
+    lv_obj_align(v_slider, LV_ALIGN_TOP_RIGHT, -22, 32);
+    lv_obj_set_style_bg_opa(v_slider, LV_OPA_TRANSP, LV_PART_INDICATOR);
     lv_obj_add_event_cb(v_slider, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
 
+    joystick_btn_matrix = lv_btnmatrix_create(parent);
+    lv_btnmatrix_set_map(joystick_btn_matrix, JOYSTICK_BTN_MAP);
+    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 0, LV_BTNMATRIX_CTRL_HIDDEN);
+    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 2, LV_BTNMATRIX_CTRL_HIDDEN);
+    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 4, LV_BTNMATRIX_CTRL_HIDDEN);
+    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 6, LV_BTNMATRIX_CTRL_HIDDEN);
+    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 8, LV_BTNMATRIX_CTRL_HIDDEN);
+    lv_obj_add_style(joystick_btn_matrix, gui_style_btnmatrix_main(), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(joystick_btn_matrix, LV_OPA_TRANSP, LV_PART_ITEMS);
+    lv_obj_set_style_border_width(joystick_btn_matrix, 0, LV_PART_ITEMS);
+    lv_obj_set_style_text_font(joystick_btn_matrix, UI_FONT_M, LV_PART_MAIN);
+    lv_btnmatrix_set_btn_ctrl_all(joystick_btn_matrix, LV_BTNMATRIX_CTRL_NO_REPEAT);
+    lv_obj_add_event_cb(joystick_btn_matrix, button_handler, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(joystick_btn_matrix, button_handler, LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(joystick_btn_matrix, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_set_size(joystick_btn_matrix, UI_MEDIA_FOOTER_HIGHT, UI_MEDIA_FOOTER_HIGHT);
+    lv_obj_align(joystick_btn_matrix, LV_ALIGN_BOTTOM_RIGHT, -10, 0);
+
     lv_obj_t *footer = lv_obj_create(parent);
-    lv_obj_set_size(footer, LV_PCT(100), UI_MEDIA_FOOTER_HIGHT);
-    lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_size(footer, LV_PCT(80), UI_MEDIA_FOOTER_HIGHT);
+    lv_obj_align(footer, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
     info_label = lv_label_create(footer);
     lv_obj_set_style_text_font(info_label, UI_FONT_S, 0);
@@ -254,14 +344,14 @@ void camera_view_create(lv_obj_t *parent)
 
     cam_btn_matrix = lv_btnmatrix_create(footer);
     lv_btnmatrix_set_map(cam_btn_matrix, CAM_BTN_MAP_PLAY);
-    lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 1, LV_BTNMATRIX_CTRL_CHECKABLE);
-    lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 2, LV_BTNMATRIX_CTRL_CHECKABLE);
-    lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 3, LV_BTNMATRIX_CTRL_CHECKABLE);
+    // lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 1, LV_BTNMATRIX_CTRL_CHECKABLE);
+    // lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 2, LV_BTNMATRIX_CTRL_CHECKABLE);
+    // lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 3, LV_BTNMATRIX_CTRL_CHECKABLE);
     lv_obj_add_style(cam_btn_matrix, gui_style_btnmatrix_main(), LV_PART_MAIN);
     lv_obj_add_style(cam_btn_matrix, gui_style_btnmatrix_items(), LV_PART_ITEMS);
     lv_obj_set_style_text_font(cam_btn_matrix, UI_FONT_M, LV_PART_MAIN);
     lv_obj_add_event_cb(cam_btn_matrix, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_set_size(cam_btn_matrix, 280, 48);
+    lv_obj_set_size(cam_btn_matrix, 2 * 48, 48);
     lv_obj_align(cam_btn_matrix, LV_ALIGN_BOTTOM_MID, 10, 0);
 
     pic_size_dropdown = lv_dropdown_create(footer);
