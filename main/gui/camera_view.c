@@ -11,10 +11,14 @@
 #include "esp_netif.h"
 
 // joystick matrix button id's
-#define BTN_UP 1
-#define BTN_LEFT 3
-#define BTN_RIGHT 5
-#define BTN_DOWN 7
+#define BTN_NONE -1
+#define BTN_UP 0
+#define BTN_DOWN 1
+#define BTN_LEFT 2
+#define BTN_RIGHT 3
+static int last_joystick_btn = BTN_NONE;
+static const char *JOYSTICK_BTN_PRESSED_MAP[] = {"vi 0", "vi 180", "hi 0", "hi 180"};
+static const char *JOYSTICK_BTN_RELEASE_MAP[] = {"vi -1", "vi -1", "hi -1", "hi -1"};
 
 static const char *API_KEY = "6c19af28-9aea-41df-a680-b75743cd50ae";
 
@@ -25,8 +29,6 @@ static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, NULL};
 static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, NULL};
 // static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, LV_SYMBOL_REFRESH, LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
 // static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, LV_SYMBOL_REFRESH, LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
-static const char *JOYSTICK_BTN_MAP[] = {"0", LV_SYMBOL_UP, "2", "\n", LV_SYMBOL_LEFT, "4", LV_SYMBOL_RIGHT, "\n", "6", LV_SYMBOL_DOWN, "8", NULL};
-static int last_joystick_btn_id = LV_BTNMATRIX_BTN_NONE;
 
 static int h_flip = 0;
 static int v_flip = 0;
@@ -39,7 +41,7 @@ static lv_obj_t *h_slider = NULL;
 static lv_obj_t *v_slider = NULL;
 static lv_obj_t *cam_select_dropdown = NULL;
 static lv_obj_t *cam_btn_matrix = NULL;
-static lv_obj_t *joystick_btn_matrix = NULL;
+static lv_obj_t *joystick = NULL;
 static lv_obj_t *pic_size_dropdown = NULL;
 static lv_obj_t *cam_image = NULL;
 static lv_obj_t *info_label = NULL;
@@ -48,8 +50,11 @@ static int frame_count = 0;
 
 esp_websocket_client_handle_t client = NULL;
 
+LV_IMG_DECLARE(joystick_120x120);
+
 static void websocket_send(char *msg)
 {
+    ESP_LOGI(TAG, "websocket_send: %s", msg);
     esp_websocket_client_send_text(client, msg, strlen(msg), portMAX_DELAY);
 }
 
@@ -77,7 +82,7 @@ static void websocket_event_handler(void *handler_args, esp_event_base_t base, i
             if (strcmp(id, "hp") == 0)
                 lv_slider_set_value(h_slider, pos, LV_ANIM_ON);
             if (strcmp(id, "vp") == 0)
-                lv_slider_set_value(v_slider, pos, LV_ANIM_ON);
+                lv_slider_set_value(v_slider, 180 - pos, LV_ANIM_ON);
         }
         break;
     case WEBSOCKET_EVENT_ERROR:
@@ -233,55 +238,48 @@ static void button_handler(lv_event_t *e)
                 cam_stream_open();
             }
         }
-        else if ((target == h_slider || target == v_slider) && esp_websocket_client_is_connected(client))
+        else if (target == h_slider && esp_websocket_client_is_connected(client))
         {
             char data[8] = {0};
-            sprintf(data, "%s %d", target == h_slider ? "hp" : "vp", (int)lv_slider_get_value(target));
-            esp_websocket_client_send_text(client, data, strlen(data), portMAX_DELAY);
+            sprintf(data, "hc %d", (int)lv_slider_get_value(target));
+            websocket_send(data);
+        }
+        else if (target == v_slider && esp_websocket_client_is_connected(client))
+        {
+            char data[16] = {0};
+            sprintf(data, "vc %d", (int)(180 - lv_slider_get_value(target)));
+            websocket_send(data);
         }
     }
 
-    if (target == joystick_btn_matrix && esp_websocket_client_is_connected(client))
+    if (target == joystick && esp_websocket_client_is_connected(client))
     {
-        btn_id = lv_btnmatrix_get_selected_btn(target);
-        ESP_LOGD(TAG, "event_code = %d, btn_id = %d", code, btn_id);
-        if (code == LV_EVENT_PRESSED)
+        lv_point_t p;
+        lv_area_t coords;
+        lv_obj_get_coords(joystick, &coords);
+        lv_indev_get_point(lv_indev_get_act(), &p);
+        int x = p.x - ((coords.x1 + coords.x2) / 2);
+        int y = p.y - ((coords.y1 + coords.y2) / 2);
+        if (code == LV_EVENT_RELEASED || (abs(x) < 15 && abs(y) < 15))
         {
-            last_joystick_btn_id = btn_id;
-            if (btn_id == BTN_UP)
-                websocket_send("vp 180");
-            else if (btn_id == BTN_DOWN)
-                websocket_send("vp 0");
-            else if (btn_id == BTN_LEFT)
-                websocket_send("hp 0");
-            else if (btn_id == BTN_RIGHT)
-                websocket_send("hp 180");
+            if (last_joystick_btn != BTN_NONE)
+                websocket_send(JOYSTICK_BTN_RELEASE_MAP[last_joystick_btn]);
+            last_joystick_btn = BTN_NONE;
         }
-        else if (code == LV_EVENT_RELEASED)
+        if (code == LV_EVENT_PRESSED || code == LV_EVENT_PRESSING)
         {
-            if (btn_id == BTN_UP || btn_id == BTN_DOWN)
-                websocket_send("vp -1");
-            else if (btn_id == BTN_LEFT || btn_id == BTN_RIGHT)
-                websocket_send("hp -1");
-            last_joystick_btn_id = LV_BTNMATRIX_BTN_NONE;
-        }
-        else if (code == LV_EVENT_VALUE_CHANGED)
-        {
-            if (last_joystick_btn_id != LV_BTNMATRIX_BTN_NONE)
+            int button;
+            if (x < y)
+                button = (x > -y) ? BTN_DOWN : BTN_LEFT;
+            else
+                button = (x > -y) ? BTN_RIGHT : BTN_UP;
+            if (button != last_joystick_btn)
             {
-                if (last_joystick_btn_id == BTN_UP || last_joystick_btn_id == BTN_DOWN)
-                    websocket_send("vp -1");
-                else if (last_joystick_btn_id == BTN_LEFT || last_joystick_btn_id == BTN_RIGHT)
-                    websocket_send("hp -1");
+                if (last_joystick_btn != BTN_NONE)
+                    websocket_send(JOYSTICK_BTN_RELEASE_MAP[last_joystick_btn]);
+                websocket_send(JOYSTICK_BTN_PRESSED_MAP[button]);
             }
-            if (btn_id == 1)
-                websocket_send("vp 180");
-            else if (btn_id == 7)
-                websocket_send("vp 0");
-            else if (btn_id == 3)
-                websocket_send("hp 0");
-            else if (btn_id == 5)
-                websocket_send("hp 180");
+            last_joystick_btn = button;
         }
     }
 }
@@ -308,27 +306,18 @@ void camera_view_create(lv_obj_t *parent)
     lv_slider_set_range(v_slider, 0, 180);
     lv_slider_set_value(v_slider, 180, LV_ANIM_OFF);
     lv_obj_set_size(v_slider, 6, 256);
-    lv_obj_align(v_slider, LV_ALIGN_TOP_RIGHT, -22, 32);
+    lv_obj_align(v_slider, LV_ALIGN_TOP_RIGHT, -32, 32);
     lv_obj_set_style_bg_opa(v_slider, LV_OPA_TRANSP, LV_PART_INDICATOR);
     lv_obj_add_event_cb(v_slider, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
 
-    joystick_btn_matrix = lv_btnmatrix_create(parent);
-    lv_btnmatrix_set_map(joystick_btn_matrix, JOYSTICK_BTN_MAP);
-    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 0, LV_BTNMATRIX_CTRL_HIDDEN);
-    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 2, LV_BTNMATRIX_CTRL_HIDDEN);
-    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 4, LV_BTNMATRIX_CTRL_HIDDEN);
-    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 6, LV_BTNMATRIX_CTRL_HIDDEN);
-    lv_btnmatrix_set_btn_ctrl(joystick_btn_matrix, 8, LV_BTNMATRIX_CTRL_HIDDEN);
-    lv_obj_add_style(joystick_btn_matrix, gui_style_btnmatrix_main(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(joystick_btn_matrix, LV_OPA_TRANSP, LV_PART_ITEMS);
-    lv_obj_set_style_border_width(joystick_btn_matrix, 0, LV_PART_ITEMS);
-    lv_obj_set_style_text_font(joystick_btn_matrix, UI_FONT_M, LV_PART_MAIN);
-    lv_btnmatrix_set_btn_ctrl_all(joystick_btn_matrix, LV_BTNMATRIX_CTRL_NO_REPEAT);
-    lv_obj_add_event_cb(joystick_btn_matrix, button_handler, LV_EVENT_PRESSED, NULL);
-    lv_obj_add_event_cb(joystick_btn_matrix, button_handler, LV_EVENT_RELEASED, NULL);
-    lv_obj_add_event_cb(joystick_btn_matrix, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_set_size(joystick_btn_matrix, UI_MEDIA_FOOTER_HIGHT, UI_MEDIA_FOOTER_HIGHT);
-    lv_obj_align(joystick_btn_matrix, LV_ALIGN_BOTTOM_RIGHT, -10, 0);
+    joystick = lv_img_create(parent);
+    lv_obj_add_flag(joystick, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_size(joystick, UI_MEDIA_FOOTER_HIGHT, UI_MEDIA_FOOTER_HIGHT);
+    lv_obj_add_event_cb(joystick, button_handler, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(joystick, button_handler, LV_EVENT_PRESSING, NULL);
+    lv_obj_add_event_cb(joystick, button_handler, LV_EVENT_RELEASED, NULL);
+    lv_img_set_src(joystick, &joystick_120x120);
+    lv_obj_align(joystick, LV_ALIGN_BOTTOM_RIGHT, -10, 0);
 
     lv_obj_t *footer = lv_obj_create(parent);
     lv_obj_set_size(footer, LV_PCT(80), UI_MEDIA_FOOTER_HIGHT);

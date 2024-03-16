@@ -539,7 +539,7 @@ esp_err_t display_lvgl_init(esp_lcd_handle_t esp_lcd, esp_audio_handle_t audio_h
     ESP_LOGI(TAG, "LVGL port - init");
     const lvgl_port_cfg_t lvgl_cfg = {
         .task_priority = 4,
-        .task_stack = 4096,       /* LVGL task stack size */
+        .task_stack = 8 * 1024,   /* LVGL task stack size */
         .task_affinity = 1,       /* LVGL task pinned to core (-1 is no affinity) */
         .task_max_sleep_ms = 500, /* Maximum sleep in LVGL task */
         .timer_period_ms = 5      /* LVGL timer tick period in ms */
