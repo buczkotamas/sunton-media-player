@@ -120,7 +120,7 @@ void download_task(void *p)
                 close_http_client();
                 run_jpg_stream = false;
                 jpg_stream_closed = true;
-                (event_cb)(JPG_STREAM_EVENT_ERROR, "Reconnection error", NULL);
+                (event_cb)(JPG_STREAM_EVENT_ERROR, "Connection error", NULL);
                 vTaskDelete(NULL);
             }
         }

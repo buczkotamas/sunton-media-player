@@ -23,7 +23,7 @@ set(COMPONENT_SRCS
     "img/microsd_140x40.c"
     "img/radio_128x104.c"
     "img/tunein_refresh_128x128.c"
-    "img/joystick_120x120.c"
+    "img/joystick_160x160.c"
 )
 set(COMPONENT_ADD_INCLUDEDIRS "include")
 set(REQUIRES json)

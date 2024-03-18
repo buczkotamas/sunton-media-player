@@ -10,7 +10,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 
-// joystick matrix button id's
+// joystick
 #define BTN_NONE -1
 #define BTN_UP 0
 #define BTN_DOWN 1
@@ -25,10 +25,9 @@ static const char *API_KEY = "6c19af28-9aea-41df-a680-b75743cd50ae";
 static const char *TAG = "CAMERA_VIEW";
 static const char *PIC_SIZE_ITEMS = "160x120\n176x144\n240x176\n240X240\n320x240\n400x296\n480x320";
 static const int PIC_SIZE_HIGHT[] = {0, 120, 144, 176, 240, 240, 296, 320};
-static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, NULL};
-static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, NULL};
-// static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, LV_SYMBOL_REFRESH, LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
-// static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, LV_SYMBOL_REFRESH, LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
+static const int PIC_SIZE_WIDTH[] = {0, 160, 176, 240, 240, 320, 400, 480};
+static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, LV_SYMBOL_REFRESH, "\n", LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
+static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, LV_SYMBOL_REFRESH, "\n", LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
 
 static int h_flip = 0;
 static int v_flip = 0;
@@ -44,13 +43,14 @@ static lv_obj_t *cam_btn_matrix = NULL;
 static lv_obj_t *joystick = NULL;
 static lv_obj_t *pic_size_dropdown = NULL;
 static lv_obj_t *cam_image = NULL;
-static lv_obj_t *info_label = NULL;
+static lv_obj_t *ip_label = NULL;
+static lv_obj_t *fsp_label = NULL;
 static lv_timer_t *fps_timer = NULL;
 static int frame_count = 0;
 
 esp_websocket_client_handle_t client = NULL;
 
-LV_IMG_DECLARE(joystick_120x120);
+LV_IMG_DECLARE(joystick_160x160);
 
 static void websocket_send(char *msg)
 {
@@ -117,7 +117,7 @@ static void timer_handle(lv_timer_t *timer)
 {
     if (timer == fps_timer)
     {
-        lv_label_set_text_fmt(info_label, "Camera IP: %s FPS: %d", cam_address, frame_count);
+        lv_label_set_text_fmt(fsp_label, "FPS: %d", frame_count);
         frame_count = 0;
     }
 }
@@ -137,6 +137,7 @@ static void stream_event_cb(jpg_stream_event_t event, uint16_t *data, esp_jpeg_i
         frame_count = 0;
         if (fps_timer == NULL)
             fps_timer = lv_timer_create(timer_handle, 1000, NULL);
+        lv_label_set_text_fmt(ip_label, "Camera IP: %s", cam_address);
         msg_window_hide();
         break;
     case JPG_STREAM_EVENT_CLOSE:
@@ -146,19 +147,21 @@ static void stream_event_cb(jpg_stream_event_t event, uint16_t *data, esp_jpeg_i
         if (fps_timer != NULL)
             lv_timer_del(fps_timer);
         fps_timer = NULL;
-        lv_label_set_text_static(info_label, "No camera connected");
+        lv_label_set_text_static(ip_label, "No camera connected");
+        lv_label_set_text_static(fsp_label, "FSP: -");
         msg_window_hide();
         break;
     case JPG_STREAM_EVENT_ERROR:
         websocket_close();
-        msg_window_show_ok("%s  %s", LV_SYMBOL_WARNING, (char *)data);
         lv_btnmatrix_set_map(cam_btn_matrix, CAM_BTN_MAP_PLAY);
         is_stream_open = false;
         frame_count = 0;
         if (fps_timer != NULL)
             lv_timer_del(fps_timer);
         fps_timer = NULL;
-        lv_label_set_text_static(info_label, "No camera connected");
+        lv_label_set_text_static(ip_label, "No camera connected");
+        lv_label_set_text_static(fsp_label, "FSP: -");
+        msg_window_show_ok("%s  %s", LV_SYMBOL_WARNING, (char *)data);
         break;
     case JPG_STREAM_EVENT_STATUS:
         break;
@@ -187,8 +190,9 @@ static void cam_stream_open()
 
     lv_obj_t *parent = lv_obj_get_parent(cam_image);
     lv_coord_t parent_height = lv_obj_get_content_height(parent);
-    int y_offset = (parent_height - UI_MEDIA_FOOTER_HIGHT - PIC_SIZE_HIGHT[pic_size]) / 2;
-    lv_obj_align(cam_image, LV_ALIGN_TOP_MID, 0, y_offset);
+    int y_offset = (320 - PIC_SIZE_HIGHT[pic_size]) / 2;
+    int x_offset = (480 - PIC_SIZE_WIDTH[pic_size]) / 2;
+    lv_obj_align(cam_image, LV_ALIGN_TOP_LEFT, x_offset + 10, y_offset + 10);
 }
 
 static void button_handler(lv_event_t *e)
@@ -260,13 +264,13 @@ static void button_handler(lv_event_t *e)
         lv_indev_get_point(lv_indev_get_act(), &p);
         int x = p.x - ((coords.x1 + coords.x2) / 2);
         int y = p.y - ((coords.y1 + coords.y2) / 2);
-        if (code == LV_EVENT_RELEASED || (abs(x) < 15 && abs(y) < 15))
+        if (code == LV_EVENT_RELEASED || (abs(x) < 16 && abs(y) < 16))
         {
             if (last_joystick_btn != BTN_NONE)
                 websocket_send(JOYSTICK_BTN_RELEASE_MAP[last_joystick_btn]);
             last_joystick_btn = BTN_NONE;
         }
-        if (code == LV_EVENT_PRESSED || code == LV_EVENT_PRESSING)
+        else if (code == LV_EVENT_PRESSED || code == LV_EVENT_PRESSING)
         {
             int button;
             if (x < y)
@@ -292,69 +296,74 @@ static const char *get_cameras(void)
 void camera_view_create(lv_obj_t *parent)
 {
     cam_image = lv_canvas_create(parent);
-    lv_obj_align(cam_image, LV_ALIGN_TOP_MID, 0, 32);
+    lv_obj_align(cam_image, LV_ALIGN_TOP_LEFT, 10, 10);
 
     h_slider = lv_slider_create(parent);
     lv_slider_set_range(h_slider, 0, 180);
     lv_slider_set_value(h_slider, 90, LV_ANIM_OFF);
-    lv_obj_set_size(h_slider, LV_PCT(90), 6);
-    lv_obj_align(h_slider, LV_ALIGN_BOTTOM_MID, 0, -UI_MEDIA_FOOTER_HIGHT - 16);
+    lv_obj_set_size(h_slider, 440, 6);
     lv_obj_set_style_bg_opa(h_slider, LV_OPA_TRANSP, LV_PART_INDICATOR);
     lv_obj_add_event_cb(h_slider, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_set_pos(h_slider, 30, 350);
 
     v_slider = lv_slider_create(parent);
     lv_slider_set_range(v_slider, 0, 180);
     lv_slider_set_value(v_slider, 180, LV_ANIM_OFF);
-    lv_obj_set_size(v_slider, 6, 256);
-    lv_obj_align(v_slider, LV_ALIGN_TOP_RIGHT, -32, 32);
+    lv_obj_set_size(v_slider, 6, 280);
     lv_obj_set_style_bg_opa(v_slider, LV_OPA_TRANSP, LV_PART_INDICATOR);
     lv_obj_add_event_cb(v_slider, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_set_pos(v_slider, 510, 30);
 
     joystick = lv_img_create(parent);
     lv_obj_add_flag(joystick, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_size(joystick, UI_MEDIA_FOOTER_HIGHT, UI_MEDIA_FOOTER_HIGHT);
+    lv_obj_set_size(joystick, 160, 160);
     lv_obj_add_event_cb(joystick, button_handler, LV_EVENT_PRESSED, NULL);
     lv_obj_add_event_cb(joystick, button_handler, LV_EVENT_PRESSING, NULL);
     lv_obj_add_event_cb(joystick, button_handler, LV_EVENT_RELEASED, NULL);
-    lv_img_set_src(joystick, &joystick_120x120);
-    lv_obj_align(joystick, LV_ALIGN_BOTTOM_RIGHT, -10, 0);
+    lv_img_set_src(joystick, &joystick_160x160);
+    lv_obj_align(joystick, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
 
-    lv_obj_t *footer = lv_obj_create(parent);
-    lv_obj_set_size(footer, LV_PCT(80), UI_MEDIA_FOOTER_HIGHT);
-    lv_obj_align(footer, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    ip_label = lv_label_create(parent);
+    lv_obj_set_style_text_font(ip_label, UI_FONT_S, 0);
+    lv_label_set_long_mode(ip_label, LV_LABEL_LONG_CLIP);
+    lv_label_set_text_static(ip_label, "No camera connected");
+    lv_obj_set_width(ip_label, 256);
+    lv_obj_set_style_text_align(ip_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_align_to(ip_label, h_slider, LV_ALIGN_OUT_BOTTOM_LEFT, -10, 20);
 
-    info_label = lv_label_create(footer);
-    lv_obj_set_style_text_font(info_label, UI_FONT_S, 0);
-    lv_label_set_long_mode(info_label, LV_LABEL_LONG_CLIP);
-    lv_label_set_text_static(info_label, "No camera connected");
-    lv_obj_set_width(info_label, LV_PCT(100));
-    lv_obj_set_style_text_align(info_label, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_align(info_label, LV_ALIGN_TOP_LEFT, 0, -5);
+    fsp_label = lv_label_create(parent);
+    lv_obj_set_style_text_font(fsp_label, UI_FONT_S, 0);
+    lv_label_set_long_mode(fsp_label, LV_LABEL_LONG_CLIP);
+    lv_label_set_text_static(fsp_label, "FSP: -");
+    lv_obj_set_width(fsp_label, 256);
+    lv_obj_set_style_text_align(fsp_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_align_to(fsp_label, ip_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 20);
 
-    cam_btn_matrix = lv_btnmatrix_create(footer);
+    cam_select_dropdown = lv_dropdown_create(parent);
+    lv_dropdown_set_options(cam_select_dropdown, get_cameras());
+    lv_obj_add_event_cb(cam_select_dropdown, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_style(cam_select_dropdown, gui_style_dropdown(), LV_PART_MAIN);
+    lv_obj_set_width(cam_select_dropdown, 160);
+    lv_obj_align(cam_select_dropdown, LV_ALIGN_TOP_RIGHT, 0, 10);
+
+    cam_btn_matrix = lv_btnmatrix_create(parent);
     lv_btnmatrix_set_map(cam_btn_matrix, CAM_BTN_MAP_PLAY);
-    // lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 1, LV_BTNMATRIX_CTRL_CHECKABLE);
-    // lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 2, LV_BTNMATRIX_CTRL_CHECKABLE);
-    // lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 3, LV_BTNMATRIX_CTRL_CHECKABLE);
+    lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 1, LV_BTNMATRIX_CTRL_CHECKABLE);
+    lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 2, LV_BTNMATRIX_CTRL_CHECKABLE);
+    lv_btnmatrix_set_btn_ctrl(cam_btn_matrix, 3, LV_BTNMATRIX_CTRL_CHECKABLE);
     lv_obj_add_style(cam_btn_matrix, gui_style_btnmatrix_main(), LV_PART_MAIN);
     lv_obj_add_style(cam_btn_matrix, gui_style_btnmatrix_items(), LV_PART_ITEMS);
+    lv_obj_set_style_radius(cam_btn_matrix, 24, LV_PART_MAIN);
     lv_obj_set_style_text_font(cam_btn_matrix, UI_FONT_M, LV_PART_MAIN);
     lv_obj_add_event_cb(cam_btn_matrix, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_set_size(cam_btn_matrix, 2 * 48, 48);
-    lv_obj_align(cam_btn_matrix, LV_ALIGN_BOTTOM_MID, 10, 0);
+    lv_obj_set_size(cam_btn_matrix, 160, 3 * 48);
+    lv_obj_align_to(cam_btn_matrix, cam_select_dropdown, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 
-    pic_size_dropdown = lv_dropdown_create(footer);
+    pic_size_dropdown = lv_dropdown_create(parent);
     lv_dropdown_set_options(pic_size_dropdown, PIC_SIZE_ITEMS);
     lv_dropdown_set_selected(pic_size_dropdown, pic_size - 1);
     lv_obj_add_event_cb(pic_size_dropdown, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_style(pic_size_dropdown, gui_style_dropdown(), LV_PART_MAIN);
     lv_obj_set_width(pic_size_dropdown, 160);
-    lv_obj_align(pic_size_dropdown, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-
-    cam_select_dropdown = lv_dropdown_create(footer);
-    lv_dropdown_set_options(cam_select_dropdown, get_cameras());
-    lv_obj_add_event_cb(cam_select_dropdown, button_handler, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_add_style(cam_select_dropdown, gui_style_dropdown(), LV_PART_MAIN);
-    lv_obj_set_width(cam_select_dropdown, 180);
-    lv_obj_align(cam_select_dropdown, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    lv_obj_align_to(pic_size_dropdown, cam_btn_matrix, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
 }
