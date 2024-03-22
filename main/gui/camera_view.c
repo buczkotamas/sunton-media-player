@@ -26,9 +26,10 @@ static const char *TAG = "CAMERA_VIEW";
 static const char *PIC_SIZE_ITEMS = "160x120\n176x144\n240x176\n240X240\n320x240\n400x296\n480x320";
 static const int PIC_SIZE_HIGHT[] = {0, 120, 144, 176, 240, 240, 296, 320};
 static const int PIC_SIZE_WIDTH[] = {0, 160, 176, 240, 240, 320, 400, 480};
-static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, LV_SYMBOL_REFRESH, "\n", LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
-static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, LV_SYMBOL_REFRESH, "\n", LV_SYMBOL_LOOP, LV_SYMBOL_CHARGE, NULL};
+static const char *CAM_BTN_MAP_PLAY[] = {LV_SYMBOL_PLAY, LV_SYMBOL_REFRESH, "\n", LV_SYMBOL_UP LV_SYMBOL_DOWN, LV_SYMBOL_RIGHT " " LV_SYMBOL_LEFT, NULL};
+static const char *CAM_BTN_MAP_STOP[] = {LV_SYMBOL_STOP, LV_SYMBOL_REFRESH, "\n", LV_SYMBOL_UP LV_SYMBOL_DOWN, LV_SYMBOL_RIGHT " " LV_SYMBOL_LEFT, NULL};
 
+static int rotate = 0;
 static int h_flip = 0;
 static int v_flip = 0;
 static int pic_size = 5;
@@ -51,6 +52,9 @@ static int frame_count = 0;
 esp_websocket_client_handle_t client = NULL;
 
 LV_IMG_DECLARE(joystick_160x160);
+
+static uint16_t *canvas_buffer = NULL;
+static int *rotate_mtrx = NULL;
 
 static void websocket_send(char *msg)
 {
@@ -127,8 +131,35 @@ static void stream_event_cb(jpg_stream_event_t event, uint16_t *data, esp_jpeg_i
     switch (event)
     {
     case JPG_STREAM_EVENT_FRAME:
-        lv_canvas_set_buffer(cam_image, data, img->width, img->height, LV_IMG_CF_TRUE_COLOR);
+        if (rotate == 0 || canvas_buffer == NULL || rotate_mtrx == NULL)
+        {
+            lv_canvas_set_buffer(cam_image, data, img->width, img->height, LV_IMG_CF_TRUE_COLOR);
+        }
+        else
+        {
+            for (int i = 0; i < img->height * img->width; i++)
+            {
+                canvas_buffer[rotate_mtrx[i]] = data[i];
+            }
+        }
         lv_obj_invalidate(cam_image);
+
+        // int h_zoom = (480 * LV_IMG_ZOOM_NONE) / img->width;
+        // int v_zoom = (320 * LV_IMG_ZOOM_NONE) / img->height;
+        // uint16_t zoom = h_zoom < v_zoom ? h_zoom : v_zoom;
+        // int h_size = (img->width * zoom) / LV_IMG_ZOOM_NONE;
+        // int v_size = (img->height * zoom) / LV_IMG_ZOOM_NONE;
+        // lv_img_dsc_t image = {
+        //     .data = (uint8_t *)data,
+        //     .data_size = img->width * img->height * sizeof(uint16_t),
+        //     .header = {
+        //         .w = img->width,
+        //         .h = img->height,
+        //         .cf = LV_IMG_CF_TRUE_COLOR,
+        //     }};
+        // zoom = 256;
+        // lv_canvas_transform(cam_image, &image, 900, zoom, 0, 0, img->width / 2, img->height / 2, false);
+
         frame_count++;
         break;
     case JPG_STREAM_EVENT_OPEN:
@@ -188,10 +219,45 @@ static void cam_stream_open()
     esp_err_t ret = jpg_stream_open(url, stream_event_cb);
     ESP_LOGI(TAG, "cam_stream_open [%s] = %d", url, ret);
 
-    lv_obj_t *parent = lv_obj_get_parent(cam_image);
-    lv_coord_t parent_height = lv_obj_get_content_height(parent);
-    int y_offset = (320 - PIC_SIZE_HIGHT[pic_size]) / 2;
-    int x_offset = (480 - PIC_SIZE_WIDTH[pic_size]) / 2;
+    if (rotate_mtrx != NULL)
+    {
+        free(rotate_mtrx);
+        rotate_mtrx = NULL;
+    }
+    if (canvas_buffer != NULL)
+    {
+        free(canvas_buffer);
+        canvas_buffer = NULL;
+    }
+    int y_offset = 0;
+    int x_offset = 0;
+    int pic_h = PIC_SIZE_HIGHT[pic_size];
+    int pic_w = PIC_SIZE_WIDTH[pic_size];
+    if (rotate == 0)
+    {
+        y_offset = (320 - pic_h) / 2;
+        x_offset = (480 - pic_w) / 2;
+    }
+    else
+    {
+        y_offset = (320 - pic_w) / 2;
+        x_offset = (480 - pic_h) / 2;
+        rotate_mtrx = (int *)malloc(pic_h * pic_w * sizeof(int));
+        if (rotate_mtrx == NULL)
+            ESP_LOGE(TAG, "Cannot allocate memmory for rotate_mtrx");
+        canvas_buffer = (uint16_t *)malloc(pic_h * pic_w * sizeof(uint16_t));
+        if (canvas_buffer == NULL)
+            ESP_LOGE(TAG, "Cannot allocate memmory for canvas_buffer");
+        lv_canvas_set_buffer(cam_image, canvas_buffer, pic_h, pic_w, LV_IMG_CF_TRUE_COLOR);
+
+        for (int h = 0; h < pic_h; h++)
+        {
+            for (int w = 0; w < pic_w; w++)
+            {
+                rotate_mtrx[h * pic_w + w] = (pic_h - (h + 1)) + (pic_h * w);
+            }
+        }
+    }
     lv_obj_align(cam_image, LV_ALIGN_TOP_LEFT, x_offset + 10, y_offset + 10);
 }
 
@@ -214,11 +280,11 @@ static void button_handler(lv_event_t *e)
                 return;
             }
             if (btn_id == 1)
-                h_flip = h_flip == 0 ? 1 : 0;
+                rotate = rotate == 0 ? 1 : 0;
             if (btn_id == 2)
                 v_flip = v_flip == 0 ? 1 : 0;
             if (btn_id == 3)
-                led = led == 0 ? 1 : 0;
+                h_flip = h_flip == 0 ? 1 : 0;
             if (is_stream_open)
             {
                 jpg_stream_close();
